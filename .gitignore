@@ -1,5 +1,24 @@
+# Model weights and training outputs (see models/README.md)
+*.h5
+*.keras
+models/*
+!models/README.md
+
+# Dataset
+UTKFace/
+
+# Python
+__pycache__/
+.pytest_cache/
+.venv/
+.env
+
+# Node
+node_modules/
+dist/
+
+# Documents not published
 *.pptx
 *.docx
-*.h5
+
 .ipynb_checkpoints/
-__pycache__/
