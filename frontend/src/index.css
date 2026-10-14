@@ -1,0 +1,129 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* "Darkroom" palette: warm black + safelight orange; light theme is a contact print on paper */
+:root,
+:root[data-theme="dark"] {
+  --bg: #0e0c0b;
+  --surface: #171412;
+  --surface-2: #1f1b18;
+  --line: #2e2723;
+  --text: #efe6dc;
+  --muted: #9b8f84;
+  --accent: #ff5a36;
+  --accent-soft: rgb(255 90 54 / 0.14);
+  --amber: #e8b04a;
+  --grain-opacity: 0.07;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #f3eee6;
+  --surface: #fbf8f3;
+  --surface-2: #ece5da;
+  --line: #d9cfc2;
+  --text: #1b1613;
+  --muted: #6f655c;
+  --accent: #d63b17;
+  --accent-soft: rgb(214 59 23 / 0.1);
+  --amber: #a86b00;
+  --grain-opacity: 0.05;
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-amber: var(--amber);
+  --font-display: "Instrument Serif", ui-serif, Georgia, serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-block-start: 4.5rem;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* Film grain over the whole page */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Small uppercase technical labels, like markings on a film edge */
+.label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Age slider styled as a measuring ruler */
+.ruler {
+  appearance: none;
+  inline-size: 100%;
+  block-size: 2.75rem;
+  /* a tick per year; the decade marks are drawn by the labels underneath */
+  background: repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px calc(100% / 89)) bottom / 100% 35% no-repeat;
+  cursor: pointer;
+}
+.ruler::-webkit-slider-thumb {
+  appearance: none;
+  inline-size: 3px;
+  block-size: 2.75rem;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.ruler::-moz-range-thumb {
+  inline-size: 3px;
+  block-size: 2.75rem;
+  border: 0;
+  border-radius: 0;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+/* Sprocket holes along a film strip */
+.sprockets {
+  background-image: radial-gradient(circle, var(--bg) 0 3px, transparent 3.5px);
+  background-size: 18px 12px;
+  background-repeat: repeat-x;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
