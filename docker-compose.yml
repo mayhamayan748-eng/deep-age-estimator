@@ -1,0 +1,22 @@
+name: deep-age-estimator
+
+services:
+  backend:
+    build: ./backend
+    environment:
+      MODELS_DIR: /models
+      # Only needed if the browser calls the API directly (not through the nginx proxy)
+      CORS_ORIGINS: http://localhost:3000
+    volumes:
+      - ./models:/models:ro
+    restart: unless-stopped
+    # Not published: only reachable through the frontend's /api proxy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
