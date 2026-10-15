@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     # Age model used when /api/predict gets no ?model=; empty = best by validation MAE
     default_model: str = ""
     log_level: str = "INFO"
+    # Built frontend (frontend/dist) to serve from the API itself, for single-container
+    # hosting such as Hugging Face Spaces. Unset when nginx serves the frontend.
+    static_dir: Path | None = None
 
     @property
     def cors_origin_list(self) -> list[str]:

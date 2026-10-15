@@ -1,10 +1,12 @@
 import logging
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import Settings, get_settings
 from app.routers import generate, health, info, predict
@@ -59,7 +61,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     for r in (health.router, predict.router, generate.router, info.router):
         app.include_router(r, prefix="/api")
+
+    if settings.static_dir:
+        mount_frontend(app, settings.static_dir)
     return app
+
+
+def mount_frontend(app: FastAPI, static_dir: Path) -> None:
+    """Serve the built React app, with index.html as the fallback for client-side routes."""
+    root = static_dir.resolve()
+    index = root / "index.html"
+    app.mount("/assets", StaticFiles(directory=root / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def frontend(path: str):
+        if path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not found")
+        file = (root / path).resolve()
+        if path and file.is_file() and root in file.parents:
+            return FileResponse(file)
+        return FileResponse(index)
 
 
 app = create_app()
