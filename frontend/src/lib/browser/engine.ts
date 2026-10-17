@@ -24,6 +24,7 @@ const MAX_DETECTION_SIDE = 1280;
 const NOISE_DIM = 100;
 
 const MODEL_FILES: Record<ModelName, { file: string; label: string; channels: 1 | 3 }> = {
+  efficientnet_diverse: { file: "age_efficientnet_diverse.onnx", label: "EfficientNetB0 + FairFace · RGB · diverse training data", channels: 3 },
   efficientnet: { file: "age_efficientnet.onnx", label: "EfficientNetB0 · RGB · transfer learning", channels: 3 },
   cnn_gan: { file: "age_cnn_gan.onnx", label: "CNN + GAN augmentation · grayscale", channels: 1 },
   cnn: { file: "age_cnn.onnx", label: "CNN · grayscale", channels: 1 },
@@ -53,6 +54,7 @@ interface Metrics {
   dataset: Record<string, unknown>;
   best_model: ModelName;
   gan: Record<string, unknown>;
+  fairface_test?: ModelInfo["fairface_test"];
   models: Record<ModelName, { val_mae: number; test_mae: number; test_rmse: number; mae_by_age_group: Record<string, number> }>;
 }
 let metricsPromise: Promise<Metrics> | null = null;
@@ -66,7 +68,7 @@ async function health(): Promise<Health> {
   void session(MODEL_FILES[m.best_model].file).catch(() => {});
   return {
     status: "ok",
-    models: { efficientnet: true, cnn_gan: true, cnn: true },
+    models: { efficientnet_diverse: true, efficientnet: true, cnn_gan: true, cnn: true },
     generator: true,
     face_detector: true,
     default_model: m.best_model,
@@ -97,6 +99,7 @@ async function modelInfo(): Promise<ModelInfo> {
     })),
     default_model: m.best_model,
     gan: { ...m.gan, loaded: true },
+    fairface_test: m.fairface_test,
   };
 }
 

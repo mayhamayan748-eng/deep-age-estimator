@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FRONTEND = ROOT / "frontend"
 DIST = FRONTEND / "dist"
 ONNX_DIR = ROOT / "models" / "onnx"
-REQUIRED = ["face_detection_yunet.onnx", "age_efficientnet.onnx", "age_cnn_gan.onnx", "age_cnn.onnx",
+REQUIRED = ["face_detection_yunet.onnx", "age_efficientnet_diverse.onnx", "age_efficientnet.onnx", "age_cnn_gan.onnx", "age_cnn.onnx",
             "gan_generator.onnx", "metrics.json"]
 
 SPACE_README = """---

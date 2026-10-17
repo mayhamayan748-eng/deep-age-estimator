@@ -3,7 +3,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
 
 export const MAX_UPLOAD_MB = 5;
 
-export type ModelName = "efficientnet" | "cnn_gan" | "cnn";
+export type ModelName = "efficientnet_diverse" | "efficientnet" | "cnn_gan" | "cnn";
 
 export interface Health {
   status: "ok" | "degraded";
@@ -56,6 +56,16 @@ export interface ModelInfo {
   models: ModelSummary[];
   default_model: ModelName | null;
   gan: Record<string, unknown>;
+  /** Per-group results on FairFace, before and after training on diverse data */
+  fairface_test?: Record<string, FairFaceGroup>;
+}
+
+export interface FairFaceGroup {
+  faces: number;
+  outside_before: number;
+  outside_after: number;
+  in_range_before: number;
+  in_range_after: number;
 }
 
 export class ApiError extends Error {
@@ -131,6 +141,7 @@ export const api: typeof serverApi = IN_BROWSER
 export const pngSrc = (b64: string) => `data:image/png;base64,${b64}`;
 
 export const MODEL_LABELS: Record<ModelName, string> = {
+  efficientnet_diverse: "EfficientNet + FairFace",
   efficientnet: "EfficientNetB0",
   cnn_gan: "CNN + GAN",
   cnn: "CNN",

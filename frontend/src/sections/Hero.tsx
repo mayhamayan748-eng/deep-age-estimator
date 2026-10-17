@@ -7,9 +7,9 @@ const ease = [0.22, 1, 0.36, 1] as const;
 export function Hero({ info }: { info: ModelInfo | null }) {
   const best = info?.models.find((m) => m.name === info.default_model);
   const stats = [
-    ["Dataset", "UTKFace · 23.7k faces"],
+    ["Data", "UTKFace + FairFace · 120k faces"],
     ["Best test MAE", best?.test_mae != null ? `${best.test_mae.toFixed(1)} years` : "—"],
-    ["Models", "CNN · CNN+GAN · EfficientNet"],
+    ["Models", "CNN · CNN+GAN · EfficientNet ×2"],
     ["Generator", "Conditional GAN"],
   ];
   const headline = ["How", "old", "does", "a", "machine", "think", "you", "are?"];
@@ -47,7 +47,7 @@ export function Hero({ info }: { info: ModelInfo | null }) {
             transition={{ duration: 0.7, delay: 0.7, ease }}
             className="mt-6 max-w-xl text-lg text-muted"
           >
-            Upload a photo and three neural networks trained on 23,000 faces estimate the age of everyone in it.
+            Upload a photo and neural networks trained on up to 120,000 faces from many regions estimate the age of everyone in it.
             Then flip the process: ask a GAN to imagine a face of any age.
           </motion.p>
 

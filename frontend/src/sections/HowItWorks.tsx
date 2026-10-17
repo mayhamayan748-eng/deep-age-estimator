@@ -1,6 +1,8 @@
 import { motion } from "motion/react";
 import { SectionHeading } from "../components/SectionHeading";
-import { MODEL_LABELS, type ModelInfo } from "../lib/api";
+import { MODEL_LABELS, type FairFaceGroup, type ModelInfo } from "../lib/api";
+
+const BAR_COLORS = ["bg-accent", "bg-amber", "bg-muted", "bg-text"];
 
 const STEPS = [
   ["Upload", "Any photo, up to 5 MB. Phone pictures, group shots and webcam captures all work."],
@@ -64,6 +66,7 @@ function Metrics({ info }: { info: ModelInfo | null }) {
   const maxErr = Math.max(...models.flatMap((m) => Object.values(m.mae_by_age_group)));
 
   return (
+    <>
     <div className="mt-20 grid gap-12 lg:grid-cols-2">
       <motion.div
         initial={{ opacity: 0, y: 24 }}
@@ -120,7 +123,7 @@ function Metrics({ info }: { info: ModelInfo | null }) {
                   return (
                     <div key={m.name} className="flex items-center gap-2">
                       <motion.div
-                        className={`h-2 origin-left rtl:origin-right ${["bg-accent", "bg-amber", "bg-muted"][mi % 3]}`}
+                        className={`h-2 origin-left rtl:origin-right ${BAR_COLORS[mi % BAR_COLORS.length]}`}
                         style={{ width: `${(v / maxErr) * 85}%` }}
                         initial={{ scaleX: 0 }}
                         whileInView={{ scaleX: 1 }}
@@ -138,12 +141,62 @@ function Metrics({ info }: { info: ModelInfo | null }) {
         <div className="mt-4 flex flex-wrap gap-4">
           {models.map((m, mi) => (
             <span key={m.name} className="label flex items-center gap-2">
-              <span className={`size-2 ${["bg-accent", "bg-amber", "bg-muted"][mi % 3]}`} />
+              <span className={`size-2 ${BAR_COLORS[mi % BAR_COLORS.length]}`} />
               {MODEL_LABELS[m.name]}
             </span>
           ))}
         </div>
       </motion.div>
     </div>
+    {info.fairface_test && <Diversity groups={info.fairface_test} />}
+    </>
+  );
+}
+
+/** Per-group FairFace results before and after adding diverse training data. */
+function Diversity({ groups }: { groups: Record<string, FairFaceGroup> }) {
+  const names = Object.keys(groups).filter((g) => g !== "All");
+  const all = groups.All;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-80px" }}
+      transition={{ duration: 0.6 }}
+      className="mt-16"
+    >
+      <h3 className="label mb-2">Diversity · FairFace test set, {all?.faces.toLocaleString("en")} faces from 7 groups</h3>
+      <p className="mb-4 max-w-2xl text-sm text-muted">
+        Adding FairFace to the training data cut the error on faces from every group roughly in half.
+        Years outside the labelled age range (lower is better) · share of predictions inside the range.
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[34rem] font-mono text-sm">
+          <thead>
+            <tr className="border-b border-line text-muted">
+              <th scope="col" className="py-2 text-start font-normal">Group</th>
+              <th scope="col" className="py-2 text-end font-normal">UTKFace only</th>
+              <th scope="col" className="py-2 text-end font-normal">+ FairFace</th>
+              <th scope="col" className="py-2 text-end font-normal">In range</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...names, "All"].map((g) => {
+              const r = groups[g];
+              return (
+                <tr key={g} className={`border-b border-line ${g === "All" ? "font-medium" : ""}`}>
+                  <th scope="row" className="py-2.5 text-start font-normal">{g.replace("_", " / ")}</th>
+                  <td className="py-2.5 text-end text-muted">{r.outside_before.toFixed(2)} y</td>
+                  <td className="py-2.5 text-end text-accent">{r.outside_after.toFixed(2)} y</td>
+                  <td className="py-2.5 text-end">
+                    {r.in_range_before.toFixed(0)}% → {r.in_range_after.toFixed(0)}%
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </motion.div>
   );
 }

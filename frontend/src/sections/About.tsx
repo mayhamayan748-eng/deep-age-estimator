@@ -9,7 +9,7 @@ export function About({ info }: { info: ModelInfo | null }) {
   const cards = [
     {
       title: "Dataset",
-      body: "UTKFace: 23,708 aligned and cropped face photos labelled with age, gender and ethnicity. Ages 0–90 are used, split 72% train, 8% validation and 20% test.",
+      body: "UTKFace: 23,708 face photos with exact ages (72% train, 8% validation, 20% test). FairFace adds 97k faces balanced across seven groups, including Middle Eastern and Latino, labelled with age ranges; the default model is trained on both.",
       link: ["UTKFace website", "https://susanqq.github.io/UTKFace/"],
     },
     {

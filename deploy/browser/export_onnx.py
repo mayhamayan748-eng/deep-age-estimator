@@ -13,7 +13,7 @@ import onnxruntime as ort
 import tensorflow as tf
 import tf2onnx
 
-AGE_MODELS = ["age_cnn.keras", "age_cnn_gan.keras", "age_efficientnet.keras"]
+AGE_MODELS = ["age_cnn.keras", "age_cnn_gan.keras", "age_efficientnet.keras", "age_efficientnet_diverse.keras"]
 OPSET = 17
 
 
