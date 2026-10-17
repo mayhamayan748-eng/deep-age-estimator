@@ -13,7 +13,7 @@ def _decode_png(b64: str) -> np.ndarray:
 def test_health_reports_loaded_models(client):
     body = client.get("/api/health").json()
     assert body["status"] == "ok"
-    assert body["models"] == {"efficientnet": True, "cnn_gan": True, "cnn": True}
+    assert body["models"] == {"efficientnet_diverse": False, "efficientnet": True, "cnn_gan": True, "cnn": True}
     assert body["generator"] is True and body["face_detector"] is True
     # No metrics.json -> first model in preference order
     assert body["default_model"] == "efficientnet"
@@ -100,6 +100,6 @@ def test_generate_without_generator_returns_503(client_without_generator):
 
 def test_model_info(client):
     body = client.get("/api/model-info").json()
-    assert [m["name"] for m in body["models"]] == ["efficientnet", "cnn_gan", "cnn"]
+    assert [m["name"] for m in body["models"]] == ["efficientnet_diverse", "efficientnet", "cnn_gan", "cnn"]
     assert body["gan"]["loaded"] is True
     assert body["preprocessing"]

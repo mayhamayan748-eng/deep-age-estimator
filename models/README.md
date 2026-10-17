@@ -4,6 +4,7 @@ Trained weights go here. They are not committed to git; this folder is mounted r
 
 | File | Produced by the notebook | Needed for |
 |---|---|---|
+| `age_efficientnet_diverse.keras` | `train_diverse.ipynb` | `/api/predict?model=efficientnet_diverse` (default) |
 | `age_efficientnet.keras` | section 5 | `/api/predict?model=efficientnet` |
 | `age_cnn_gan.keras` | section 4 | `/api/predict?model=cnn_gan` |
 | `age_cnn.keras` | section 2 | `/api/predict?model=cnn` |

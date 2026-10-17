@@ -58,6 +58,7 @@ class ModelInfoResponse(BaseModel):
     models: list[ModelSummary]
     default_model: str | None
     gan: dict
+    fairface_test: dict = Field(default={}, description="Per-group results on FairFace (before/after diverse training)")
 
 
 class ErrorResponse(BaseModel):

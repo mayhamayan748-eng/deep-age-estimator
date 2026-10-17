@@ -22,7 +22,7 @@ router = APIRouter(tags=["predict"])
 )
 async def predict(
     file: UploadFile = File(..., description="Photo containing one or more faces"),
-    model: str | None = Query(default=None, description="cnn | cnn_gan | efficientnet (default: best model)"),
+    model: str | None = Query(default=None, description="cnn | cnn_gan | efficientnet | efficientnet_diverse (default: best model)"),
     registry: ModelRegistry = Depends(get_registry),
     settings: Settings = Depends(get_settings),
 ) -> PredictResponse:

@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 # name -> (file, label). Order is the fallback preference when no metrics.json is present.
 AGE_MODELS: dict[str, tuple[str, str]] = {
+    "efficientnet_diverse": ("age_efficientnet_diverse.keras", "EfficientNetB0 + FairFace · RGB · diverse training data"),
     "efficientnet": ("age_efficientnet.keras", "EfficientNetB0 · RGB · transfer learning"),
     "cnn_gan": ("age_cnn_gan.keras", "CNN + GAN augmentation · grayscale"),
     "cnn": ("age_cnn.keras", "CNN · grayscale"),

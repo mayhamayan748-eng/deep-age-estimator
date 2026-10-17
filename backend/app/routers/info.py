@@ -7,6 +7,7 @@ from app.services.models import AGE_MODELS, ModelRegistry
 router = APIRouter(tags=["info"])
 
 INPUTS = {
+    "efficientnet_diverse": "128×128 RGB, 0-255",
     "efficientnet": "128×128 RGB, 0-255",
     "cnn_gan": "128×128 grayscale, 0-255",
     "cnn": "128×128 grayscale, 0-255",
@@ -49,4 +50,5 @@ def model_info(registry: ModelRegistry = Depends(get_registry)) -> ModelInfoResp
             "noise_dim": 100,
             "output": "128×128 grayscale",
         }) | {"loaded": registry.generator is not None},
+        fairface_test=registry.metrics.get("fairface_test", {}),
     )
