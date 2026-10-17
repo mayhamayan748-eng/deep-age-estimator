@@ -1,5 +1,5 @@
 import { useTheme } from "../hooks/useTheme";
-import type { Health } from "../lib/api";
+import { IN_BROWSER, type Health } from "../lib/api";
 
 const NAV = [
   ["predict", "Predict"],
@@ -35,7 +35,7 @@ export function Header({ health, offline }: { health: Health | null; offline: bo
         <div className="ms-auto flex items-center gap-3 md:ms-6">
           <span className="label hidden items-center gap-2 sm:flex" title={`API ${status}`}>
             <span className={`size-1.5 rounded-full ${dot}`} />
-            API {status}
+            {IN_BROWSER ? `models ${status === "online" ? "ready" : status}` : `API ${status}`}
           </span>
           <button
             type="button"

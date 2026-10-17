@@ -22,3 +22,6 @@ dist/
 *.docx
 
 .ipynb_checkpoints/
+
+# ONNX models copied in for local in-browser testing
+frontend/public/models/

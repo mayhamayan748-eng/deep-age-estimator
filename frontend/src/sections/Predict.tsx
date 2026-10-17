@@ -6,7 +6,7 @@ import { Dropzone } from "../components/Dropzone";
 import { SectionHeading } from "../components/SectionHeading";
 import { Webcam } from "../components/Webcam";
 import {
-  api, ApiError, MAX_UPLOAD_MB, MODEL_LABELS, pngSrc,
+  api, ApiError, IN_BROWSER, MAX_UPLOAD_MB, MODEL_LABELS, pngSrc,
   type Health, type ModelInfo, type ModelName, type PredictResponse,
 } from "../lib/api";
 
@@ -106,7 +106,9 @@ export function Predict({ health, info, offline }: { health: Health | null; info
         {unavailable && (
           <p role="status" className="mb-6 border-s-2 border-amber bg-surface px-4 py-3 text-sm text-muted">
             {offline
-              ? "The prediction server isn't reachable right now. Start the backend and reload the page."
+              ? IN_BROWSER
+                ? "The model files couldn't be downloaded. Check your connection and reload the page."
+                : "The prediction server isn't reachable right now. Start the backend and reload the page."
               : "The server is up but no trained model or face detector is loaded. Put the model files in ./models."}
           </p>
         )}
@@ -254,7 +256,7 @@ function Results({ state, mae, hasImage, onRetry }: { state: State; mae: number;
   if (state.kind === "loading") {
     return (
       <div className="flex flex-col gap-3" aria-busy="true">
-        <p className="label">Detecting faces…</p>
+        <p className="label">{IN_BROWSER ? "Running the model in your browser…" : "Detecting faces…"}</p>
         {[0, 1].map((i) => (
           <div key={i} className="flex animate-pulse gap-4 border border-line p-4">
             <div className="size-24 bg-surface-2" />

@@ -87,7 +87,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export const api = {
+const serverApi = {
   health: () => request<Health>("/health"),
   modelInfo: () => request<ModelInfo>("/model-info"),
   predict: (file: Blob, model?: ModelName) => {
@@ -102,6 +102,31 @@ export const api = {
       body: JSON.stringify({ age, count, seed }),
     }),
 };
+
+/** VITE_INFERENCE=browser: run the models in the visitor's browser (static hosting, no backend). */
+export const IN_BROWSER = import.meta.env.VITE_INFERENCE === "browser";
+
+// Loaded only in browser mode, so the server build doesn't ship onnxruntime
+const engine = () => import("./browser/engine").then((m) => m.browserApi);
+
+async function inBrowser<T>(call: (e: Awaited<ReturnType<typeof engine>>) => Promise<T>): Promise<T> {
+  const e = await engine();
+  try {
+    return await call(e);
+  } catch (err) {
+    if (err instanceof e.BrowserError) throw new ApiError(err.status, err.message);
+    throw new ApiError(0, "Couldn't load or run the model in this browser. Check your connection and try again.");
+  }
+}
+
+export const api: typeof serverApi = IN_BROWSER
+  ? {
+      health: () => inBrowser((e) => e.health()),
+      modelInfo: () => inBrowser((e) => e.modelInfo()),
+      predict: (file, model) => inBrowser((e) => e.predict(file, model)),
+      generate: (age, count, seed) => inBrowser((e) => e.generate(age, count, seed)),
+    }
+  : serverApi;
 
 export const pngSrc = (b64: string) => `data:image/png;base64,${b64}`;
 
