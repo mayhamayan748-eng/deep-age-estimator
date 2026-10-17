@@ -3,6 +3,9 @@
 Estimate a person's age from a face photo, and generate faces of any age with a conditional GAN.
 Graduation project by **Ayham Ayan**: a training notebook plus a full web app (FastAPI + React, packaged with Docker).
 
+**Live demo: https://ayhamayan-deep-age-estimator.static.hf.space**. The models run in your browser, so photos
+never leave your device.
+
 ![Predict section](docs/screenshots/predict.png)
 
 ## Results
@@ -99,6 +102,27 @@ npm run dev                     # http://localhost:5173, /api is proxied to :800
 | `MAX_UPLOAD_MB` | `5` | Upload size limit |
 | `DEFAULT_MODEL` | best by validation MAE | `cnn`, `cnn_gan` or `efficientnet` |
 | `VITE_API_BASE` (frontend, build time) | empty | API origin; empty means same origin |
+
+## Free hosting: models in the browser
+
+The live demo has no server. The models are exported to ONNX and run in the visitor's browser with
+[ONNX Runtime Web](https://onnxruntime.ai/docs/tutorials/web/), and the site is a free Hugging Face Static Space.
+`frontend/src/lib/browser/` re-implements the backend pipeline in TypeScript (YuNet decoding and NMS,
+OpenCV's fixed-point `INTER_LINEAR` resize and grayscale conversion). On the test photos it returns the same
+face boxes and ages as the FastAPI backend (largest difference 0.00 years).
+
+```bash
+# 1. Export the models (Linux/WSL, same environment as training); checks ONNX vs Keras outputs
+python deploy/browser/export_onnx.py models models/onnx UTKFace
+cp models/metrics.json models/onnx/
+
+# 2. Build with VITE_INFERENCE=browser and upload to a Static Space
+hf auth login
+python deploy/browser/deploy_static.py <username>/deep-age-estimator
+```
+
+The same frontend talks to the FastAPI backend when built without `VITE_INFERENCE=browser` (Docker setup above).
+`deploy/huggingface/` holds a single-container Docker Space as an alternative (needs Hugging Face PRO).
 
 ## API
 
