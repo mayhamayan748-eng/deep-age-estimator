@@ -17,10 +17,11 @@ Three models were trained on [UTKFace](https://susanqq.github.io/UTKFace/) (ages
 |---|---|---|---|
 | CNN | 128×128 grayscale | 6.16 years | 8.12 |
 | CNN + GAN augmentation | 128×128 grayscale | 5.83 years | 8.05 |
-| **EfficientNetB0** (transfer learning) | 128×128 RGB | **4.97 years** | **7.07** |
+| EfficientNetB0 (transfer learning) | 128×128 RGB | 4.97 years | 7.07 |
+| **EfficientNetB0 + FairFace** (see below) | 128×128 RGB | **4.83 years** | **6.80** |
 
-The first version of the notebook reached 6.3 years. Faces added by the conditional GAN improve the same CNN by 0.33 years;
-the web app uses EfficientNetB0 by default, the best model on the validation set.
+The first version of the notebook reached 6.3 years. Faces added by the conditional GAN improve the same CNN by 0.33 years.
+The web app uses EfficientNetB0 + FairFace by default, the best model on the validation set.
 
 MAE by age group (years):
 
@@ -29,9 +30,36 @@ MAE by age group (years):
 | CNN | 8.63 | 5.81 | 3.91 | 5.40 | 6.85 | 8.24 | 8.68 |
 | CNN + GAN | 4.28 | 4.71 | 3.74 | 5.79 | 7.55 | 8.98 | 10.14 |
 | EfficientNetB0 | 2.22 | 4.92 | 3.69 | 5.59 | 6.76 | 7.44 | 7.37 |
+| EfficientNetB0 + FairFace | 2.14 | 4.25 | 3.65 | 5.13 | 6.33 | 7.18 | 8.11 |
 
-> **Photos from outside the dataset are harder.** On four official portraits with known ages (studio lighting, unlike
-> UTKFace's mostly casual photos) EfficientNetB0 was off by 11 years on average. The test MAE describes UTKFace-like photos.
+### More diverse training data
+
+UTKFace is 42% White and has no Middle Eastern category. [`train_diverse.ipynb`](train_diverse.ipynb) fine-tunes the
+EfficientNetB0 on UTKFace plus [FairFace](https://github.com/joojs/fairface) (CC BY 4.0, 97k faces balanced across seven
+groups). FairFace labels age as ranges (20–29, 30–39, …), so training uses an interval loss: a prediction inside the
+range costs nothing, outside it the distance to the range is penalised. FairFace faces are cropped by
+[`tools/prepare_fairface.py`](tools/prepare_fairface.py) with the web app's own preprocessing.
+
+FairFace test set (official validation split, 10,925 faces never used for training). Years outside the labelled
+range, and share of predictions inside it:
+
+| Group | UTKFace only | + FairFace | In range |
+|---|---|---|---|
+| Black | 5.20 | **2.68** | 35% → 44% |
+| East Asian | 3.94 | **2.03** | 41% → 53% |
+| Indian | 4.33 | **2.20** | 36% → 49% |
+| Latino / Hispanic | 4.49 | **2.40** | 39% → 46% |
+| Middle Eastern | 4.26 | **2.21** | 39% → 48% |
+| Southeast Asian | 4.43 | **2.26** | 40% → 50% |
+| White | 4.98 | **2.40** | 36% → 47% |
+| **All** | 4.55 | **2.32** | 38% → 48% |
+
+On the UTKFace test set every ethnic group improved as well (overall 4.97 → 4.83). The trade-off: ages 60–90 got
+worse (7.37 → 8.11), because FairFace's oldest label is the wide range "70+".
+
+> **Photos from outside the datasets are harder.** On four official portraits with known ages (studio lighting, unlike
+> the mostly casual dataset photos) the default model is off by about 10 years on average. Four photos are too few to
+> rank models; the test sets above are the reliable comparison.
 
 ## Architecture
 
@@ -100,7 +128,7 @@ npm run dev                     # http://localhost:5173, /api is proxied to :800
 | `MODELS_DIR` | `../models` (`/models` in Docker) | Folder with the `.keras` files and `metrics.json` |
 | `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated origins, only needed when the browser calls the API directly |
 | `MAX_UPLOAD_MB` | `5` | Upload size limit |
-| `DEFAULT_MODEL` | best by validation MAE | `cnn`, `cnn_gan` or `efficientnet` |
+| `DEFAULT_MODEL` | best by validation MAE | `cnn`, `cnn_gan`, `efficientnet` or `efficientnet_diverse` |
 | `VITE_API_BASE` (frontend, build time) | empty | API origin; empty means same origin |
 
 ## Free hosting: models in the browser
