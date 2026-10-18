@@ -14,6 +14,8 @@ ort.env.wasm.wasmPaths = { wasm: wasmUrl, mjs: mjsUrl };
 ort.env.wasm.numThreads = 1;
 
 const MODEL_BASE = (import.meta.env.VITE_MODEL_BASE ?? `${import.meta.env.BASE_URL}models/`).replace(/\/?$/, "/");
+// Static hosts send no cache headers, so each build gets its own URLs for models and data
+const versioned = (file: string) => `${MODEL_BASE}${file}?v=${__BUILD_ID__}`;
 
 // Same constants as backend/app/services/preprocessing.py
 const IMG_SIZE = 128;
@@ -55,7 +57,7 @@ class BrowserError extends Error {
 const sessions = new Map<string, Promise<ort.InferenceSession>>();
 function session(file: string): Promise<ort.InferenceSession> {
   if (!sessions.has(file)) {
-    const s = ort.InferenceSession.create(`${MODEL_BASE}${file}`, { executionProviders: ["wasm"] });
+    const s = ort.InferenceSession.create(versioned(file), { executionProviders: ["wasm"] });
     s.catch(() => sessions.delete(file));
     sessions.set(file, s);
   }
@@ -71,13 +73,13 @@ interface Metrics {
 }
 let metricsPromise: Promise<Metrics> | null = null;
 const metrics = (): Promise<Metrics> =>
-  (metricsPromise ??= fetch(`${MODEL_BASE}metrics.json`).then((r) => r.json() as Promise<Metrics>));
+  (metricsPromise ??= fetch(versioned("metrics.json")).then((r) => r.json() as Promise<Metrics>));
 
 // Optional monotonic correction of the ensemble output (calibration.json, same file the backend uses)
 type Calibration = { x: number[]; y: number[] } | null;
 let calibrationPromise: Promise<Calibration> | null = null;
 const calibration = (): Promise<Calibration> =>
-  (calibrationPromise ??= fetch(`${MODEL_BASE}calibration.json`)
+  (calibrationPromise ??= fetch(versioned("calibration.json"))
     .then((r) => (r.ok ? (r.json() as Promise<Calibration>) : null))
     .catch(() => null));
 
