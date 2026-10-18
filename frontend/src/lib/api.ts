@@ -3,7 +3,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
 
 export const MAX_UPLOAD_MB = 5;
 
-export type ModelName = "efficientnet_diverse" | "efficientnet" | "cnn_gan" | "cnn";
+export type ModelName = "ensemble" | "efficientnet_diverse" | "efficientnet" | "cnn_gan" | "cnn";
 
 export interface Health {
   status: "ok" | "degraded";
@@ -141,6 +141,7 @@ export const api: typeof serverApi = IN_BROWSER
 export const pngSrc = (b64: string) => `data:image/png;base64,${b64}`;
 
 export const MODEL_LABELS: Record<ModelName, string> = {
+  ensemble: "Ensemble",
   efficientnet_diverse: "EfficientNet + FairFace",
   efficientnet: "EfficientNetB0",
   cnn_gan: "CNN + GAN",

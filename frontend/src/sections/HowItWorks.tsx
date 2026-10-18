@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import { SectionHeading } from "../components/SectionHeading";
 import { MODEL_LABELS, type FairFaceGroup, type ModelInfo } from "../lib/api";
 
-const BAR_COLORS = ["bg-accent", "bg-amber", "bg-muted", "bg-text"];
+const BAR_COLORS = ["bg-accent", "bg-amber", "bg-muted", "bg-text", "bg-line"];
 
 const STEPS = [
   ["Upload", "Any photo, up to 5 MB. Phone pictures, group shots and webcam captures all work."],
@@ -102,7 +102,8 @@ function Metrics({ info }: { info: ModelInfo | null }) {
         </div>
         <p className="mt-3 text-xs text-muted">
           MAE: average distance between the predicted and real age. RMSE punishes large mistakes more.
-          ★ chosen on the validation set, not the test set.
+          ★ default model. Ensemble weights and its calibration were fitted on the validation set; all
+          numbers here are on the test set, which was never used for any choice.
         </p>
       </motion.div>
 

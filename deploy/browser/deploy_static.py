@@ -17,7 +17,7 @@ FRONTEND = ROOT / "frontend"
 DIST = FRONTEND / "dist"
 ONNX_DIR = ROOT / "models" / "onnx"
 REQUIRED = ["face_detection_yunet.onnx", "age_efficientnet_diverse.onnx", "age_efficientnet.onnx", "age_cnn_gan.onnx", "age_cnn.onnx",
-            "gan_generator.onnx", "metrics.json"]
+            "gan_generator.onnx", "metrics.json", "calibration.json"]
 
 SPACE_README = """---
 title: Deep Age Estimator

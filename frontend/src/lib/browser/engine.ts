@@ -23,11 +23,23 @@ const FACE_SCORE_THRESHOLD = 0.7;
 const MAX_DETECTION_SIDE = 1280;
 const NOISE_DIM = 100;
 
-const MODEL_FILES: Record<ModelName, { file: string; label: string; channels: 1 | 3 }> = {
+type SingleModel = Exclude<ModelName, "ensemble">;
+
+const MODEL_FILES: Record<SingleModel, { file: string; label: string; channels: 1 | 3 }> = {
   efficientnet_diverse: { file: "age_efficientnet_diverse.onnx", label: "EfficientNetB0 + FairFace · RGB · diverse training data", channels: 3 },
   efficientnet: { file: "age_efficientnet.onnx", label: "EfficientNetB0 · RGB · transfer learning", channels: 3 },
   cnn_gan: { file: "age_cnn_gan.onnx", label: "CNN + GAN augmentation · grayscale", channels: 1 },
   cnn: { file: "age_cnn.onnx", label: "CNN · grayscale", channels: 1 },
+};
+
+// Same as ENSEMBLE_WEIGHTS in backend/app/services/models.py
+const ENSEMBLE_WEIGHTS: [SingleModel, number][] = [["efficientnet_diverse", 0.8], ["cnn_gan", 0.2]];
+const LABELS: Record<ModelName, string> = {
+  ensemble: "Ensemble · 80% EfficientNet + FairFace, 20% CNN + GAN",
+  efficientnet_diverse: MODEL_FILES.efficientnet_diverse.label,
+  efficientnet: MODEL_FILES.efficientnet.label,
+  cnn_gan: MODEL_FILES.cnn_gan.label,
+  cnn: MODEL_FILES.cnn.label,
 };
 
 class BrowserError extends Error {
@@ -61,14 +73,35 @@ let metricsPromise: Promise<Metrics> | null = null;
 const metrics = (): Promise<Metrics> =>
   (metricsPromise ??= fetch(`${MODEL_BASE}metrics.json`).then((r) => r.json() as Promise<Metrics>));
 
+// Optional monotonic correction of the ensemble output (calibration.json, same file the backend uses)
+type Calibration = { x: number[]; y: number[] } | null;
+let calibrationPromise: Promise<Calibration> | null = null;
+const calibration = (): Promise<Calibration> =>
+  (calibrationPromise ??= fetch(`${MODEL_BASE}calibration.json`)
+    .then((r) => (r.ok ? (r.json() as Promise<Calibration>) : null))
+    .catch(() => null));
+
+/** np.interp: piecewise-linear, clamped at both ends. */
+function interp(v: number, xs: number[], ys: number[]): number {
+  if (v <= xs[0]) return ys[0];
+  if (v >= xs[xs.length - 1]) return ys[ys.length - 1];
+  let i = 1;
+  while (xs[i] < v) i++;
+  const t = (v - xs[i - 1]) / (xs[i] - xs[i - 1]);
+  return ys[i - 1] + t * (ys[i] - ys[i - 1]);
+}
+
+const modelFiles = (name: ModelName): string[] =>
+  name === "ensemble" ? ENSEMBLE_WEIGHTS.map(([m]) => MODEL_FILES[m].file) : [MODEL_FILES[name].file];
+
 async function health(): Promise<Health> {
   const m = await metrics();
   // Start downloading the detector and the default model while the visitor reads the page
   void session("face_detection_yunet.onnx").catch(() => {});
-  void session(MODEL_FILES[m.best_model].file).catch(() => {});
+  for (const file of modelFiles(m.best_model)) void session(file).catch(() => {});
   return {
     status: "ok",
-    models: { efficientnet_diverse: true, efficientnet: true, cnn_gan: true, cnn: true },
+    models: { ensemble: true, efficientnet_diverse: true, efficientnet: true, cnn_gan: true, cnn: true },
     generator: true,
     face_detector: true,
     default_model: m.best_model,
@@ -84,14 +117,17 @@ async function modelInfo(): Promise<ModelInfo> {
       "Crop tightly around the detected face, matching how UTKFace images are framed",
       "Resize to 128×128 (grayscale for the CNNs, RGB for EfficientNet)",
       "Pixels kept in 0-255; each model rescales internally",
+      "Each model also sees the mirrored face; the two predictions are averaged",
       "Predicted value × 90 = age in years",
       "Runs entirely in your browser (ONNX Runtime Web); the photo never leaves your device",
     ],
-    models: (Object.keys(MODEL_FILES) as ModelName[]).map((name) => ({
+    models: (Object.keys(LABELS) as ModelName[]).map((name) => ({
       name,
-      label: MODEL_FILES[name].label,
+      label: LABELS[name],
       loaded: true,
-      input: MODEL_FILES[name].channels === 3 ? "128×128 RGB, 0-255" : "128×128 grayscale, 0-255",
+      input: name === "ensemble"
+        ? "128×128 RGB + grayscale, flip-averaged"
+        : MODEL_FILES[name].channels === 3 ? "128×128 RGB, 0-255" : "128×128 grayscale, 0-255",
       val_mae: m.models[name]?.val_mae ?? null,
       test_mae: m.models[name]?.test_mae ?? null,
       test_rmse: m.models[name]?.test_rmse ?? null,
@@ -113,10 +149,35 @@ async function findFaces(img: Image): Promise<Box[]> {
     .sort((a, b) => b[2] * b[3] - a[2] * a[3]);
 }
 
+/** Mirror an image left-right (img[:, ::-1]). */
+function flipHorizontal(img: Image): Image {
+  const { width: w, height: h, channels: cn } = img;
+  const out = new Uint8Array(img.data.length);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++)
+      for (let c = 0; c < cn; c++) out[(y * w + x) * cn + c] = img.data[(y * w + (w - 1 - x)) * cn + c];
+  return { ...img, data: out };
+}
+
+/** Ages from one model, averaged with its prediction on the mirrored faces (test-time augmentation). */
+async function modelYears(name: SingleModel, faces: Image[]): Promise<{ years: number[]; inputs: Image[] }> {
+  const spec = MODEL_FILES[name];
+  const inputs = faces.map((f) => (spec.channels === 1 ? bgrToGray(f) : bgrToRgb(f)));
+  const all = [...inputs, ...inputs.map(flipHorizontal)];
+  const batch = new Float32Array(all.length * IMG_SIZE * IMG_SIZE * spec.channels);
+  all.forEach((m, i) => batch.set(m.data, i * m.data.length));
+  const sess = await session(spec.file);
+  const out = await sess.run({
+    [sess.inputNames[0]]: new ort.Tensor("float32", batch, [all.length, IMG_SIZE, IMG_SIZE, spec.channels]),
+  });
+  const preds = out[sess.outputNames[0]].data as Float32Array;
+  const n = inputs.length;
+  return { years: inputs.map((_, i) => ((preds[i] + preds[n + i]) / 2) * MAX_AGE), inputs };
+}
+
 async function predict(blob: Blob, model?: ModelName): Promise<PredictResponse> {
   const name = model ?? (await metrics()).best_model;
-  const spec = MODEL_FILES[name];
-  if (!spec) throw new BrowserError(400, `Unknown or unavailable model '${model}'`);
+  if (!(name in LABELS)) throw new BrowserError(400, `Unknown or unavailable model '${model}'`);
 
   const img = await decodeImage(blob);
   if (!img) throw new BrowserError(400, "Could not decode the image");
@@ -125,28 +186,35 @@ async function predict(blob: Blob, model?: ModelName): Promise<PredictResponse> 
   if (boxes.length === 0) throw new BrowserError(422, "No face detected in the image");
 
   const [left, top, right, bottom] = FACE_MARGINS;
-  const inputs: Image[] = [];
+  const facesBgr: Image[] = [];
   const bboxes = boxes.map(([x, y, fw, fh]) => {
     const x0 = Math.trunc(Math.max(0, x - left * fw)), y0 = Math.trunc(Math.max(0, y - top * fh));
     const x1 = Math.trunc(Math.min(img.width, x + fw + right * fw)), y1 = Math.trunc(Math.min(img.height, y + fh + bottom * fh));
-    const face = resizeLinear(crop(img, x0, y0, x1, y1), IMG_SIZE, IMG_SIZE);
-    inputs.push(spec.channels === 1 ? bgrToGray(face) : bgrToRgb(face));
+    facesBgr.push(resizeLinear(crop(img, x0, y0, x1, y1), IMG_SIZE, IMG_SIZE));
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   });
 
-  const batch = new Float32Array(inputs.length * IMG_SIZE * IMG_SIZE * spec.channels);
-  inputs.forEach((m, i) => batch.set(m.data, i * m.data.length));
-  const sess = await session(spec.file);
-  const out = await sess.run({
-    [sess.inputNames[0]]: new ort.Tensor("float32", batch, [inputs.length, IMG_SIZE, IMG_SIZE, spec.channels]),
-  });
-  const preds = out[sess.outputNames[0]].data as Float32Array;
+  let ages: number[];
+  let shown: Image[];
+  if (name === "ensemble") {
+    ages = facesBgr.map(() => 0);
+    shown = [];
+    for (const [member, weight] of ENSEMBLE_WEIGHTS) {
+      const { years, inputs } = await modelYears(member, facesBgr);
+      years.forEach((y, i) => (ages[i] += weight * y));
+      if (shown.length === 0) shown = inputs; // first member's input (RGB)
+    }
+    const cal = await calibration();
+    if (cal) ages = ages.map((a) => interp(a, cal.x, cal.y));
+  } else {
+    ({ years: ages, inputs: shown } = await modelYears(name, facesBgr));
+  }
 
   const faces: FacePrediction[] = await Promise.all(
     bboxes.map(async (bbox, i) => ({
       bbox,
-      age: Math.round(preds[i] * MAX_AGE * 10) / 10,
-      crop: await encodePngBase64(inputs[i]),
+      age: Math.round(ages[i] * 10) / 10,
+      crop: await encodePngBase64(shown[i]),
     })),
   );
   return { model: name, image_width: img.width, image_height: img.height, faces };
