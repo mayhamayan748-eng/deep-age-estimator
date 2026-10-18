@@ -20,6 +20,8 @@ FACE_IMAGE = DATA_DIR / "face.jpg"  # NASA portrait of Neil Armstrong (public do
 
 CNN_AGE = 30.0           # stand-in grayscale models always predict 30 years
 EFFICIENTNET_AGE = 45.0  # stand-in RGB model always predicts 45 years
+DIVERSE_AGE = 40.0       # stand-in diverse RGB model always predicts 40 years
+ENSEMBLE_AGE = 0.8 * DIVERSE_AGE + 0.2 * CNN_AGE  # efficientnet_diverse 80% + cnn_gan 20% = 38
 
 
 def _constant_age_model(channels: int, age: float) -> keras.Model:
@@ -43,6 +45,7 @@ def models_dir(tmp_path_factory) -> Path:
     _constant_age_model(1, CNN_AGE).save(d / "age_cnn.keras")
     _constant_age_model(1, CNN_AGE).save(d / "age_cnn_gan.keras")
     _constant_age_model(3, EFFICIENTNET_AGE).save(d / "age_efficientnet.keras")
+    _constant_age_model(3, DIVERSE_AGE).save(d / "age_efficientnet_diverse.keras")
     _tiny_generator().save(d / "gan_generator.keras")
     return d
 

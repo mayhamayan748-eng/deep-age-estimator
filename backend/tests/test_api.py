@@ -3,7 +3,7 @@ import base64
 import cv2
 import numpy as np
 
-from tests.conftest import CNN_AGE, EFFICIENTNET_AGE
+from tests.conftest import CNN_AGE, EFFICIENTNET_AGE, ENSEMBLE_AGE
 
 
 def _decode_png(b64: str) -> np.ndarray:
@@ -13,10 +13,10 @@ def _decode_png(b64: str) -> np.ndarray:
 def test_health_reports_loaded_models(client):
     body = client.get("/api/health").json()
     assert body["status"] == "ok"
-    assert body["models"] == {"efficientnet_diverse": False, "efficientnet": True, "cnn_gan": True, "cnn": True}
+    assert body["models"] == {"ensemble": True, "efficientnet_diverse": True, "efficientnet": True, "cnn_gan": True, "cnn": True}
     assert body["generator"] is True and body["face_detector"] is True
-    # No metrics.json -> first model in preference order
-    assert body["default_model"] == "efficientnet"
+    # No metrics.json -> first model in preference order (the ensemble, since its members are loaded)
+    assert body["default_model"] == "ensemble"
 
 
 def test_health_without_generator(client_without_generator):
@@ -30,11 +30,11 @@ def test_predict_default_model(client, face_bytes):
     r = client.post("/api/predict", files={"file": ("face.jpg", face_bytes, "image/jpeg")})
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["model"] == "efficientnet"
+    assert body["model"] == "ensemble"
     assert (body["image_width"], body["image_height"]) == (960, 1200)
     assert len(body["faces"]) == 1
     face = body["faces"][0]
-    assert face["age"] == EFFICIENTNET_AGE
+    assert face["age"] == ENSEMBLE_AGE
     assert set(face["bbox"]) == {"x", "y", "w", "h"}
     assert _decode_png(face["crop"]).shape == (128, 128, 3)
 
@@ -45,6 +45,12 @@ def test_predict_grayscale_model_returns_grayscale_crop(client, face_bytes):
     face = r.json()["faces"][0]
     assert face["age"] == CNN_AGE
     assert _decode_png(face["crop"]).shape == (128, 128)
+
+
+def test_predict_single_rgb_model(client, face_bytes):
+    r = client.post("/api/predict?model=efficientnet", files={"file": ("face.jpg", face_bytes, "image/jpeg")})
+    assert r.status_code == 200, r.text
+    assert r.json()["faces"][0]["age"] == EFFICIENTNET_AGE
 
 
 def test_predict_no_face_returns_422(client, blank_png):
@@ -100,6 +106,6 @@ def test_generate_without_generator_returns_503(client_without_generator):
 
 def test_model_info(client):
     body = client.get("/api/model-info").json()
-    assert [m["name"] for m in body["models"]] == ["efficientnet_diverse", "efficientnet", "cnn_gan", "cnn"]
+    assert [m["name"] for m in body["models"]] == ["ensemble", "efficientnet_diverse", "efficientnet", "cnn_gan", "cnn"]
     assert body["gan"]["loaded"] is True
     assert body["preprocessing"]

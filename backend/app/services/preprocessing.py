@@ -87,8 +87,9 @@ def to_batch(model_input: np.ndarray) -> np.ndarray:
     return model_input[None].astype(np.float32)
 
 
-def denormalize_age(normalized_age: float) -> float:
-    return float(normalized_age) * MAX_AGE
+def denormalize_age(normalized_age):
+    """Works on a float or a numpy array."""
+    return normalized_age * MAX_AGE
 
 
 def normalize_age(age: float) -> float:

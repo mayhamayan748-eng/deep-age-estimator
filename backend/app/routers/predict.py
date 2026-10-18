@@ -22,7 +22,7 @@ router = APIRouter(tags=["predict"])
 )
 async def predict(
     file: UploadFile = File(..., description="Photo containing one or more faces"),
-    model: str | None = Query(default=None, description="cnn | cnn_gan | efficientnet | efficientnet_diverse (default: best model)"),
+    model: str | None = Query(default=None, description="ensemble | efficientnet_diverse | efficientnet | cnn_gan | cnn (default: best model)"),
     registry: ModelRegistry = Depends(get_registry),
     settings: Settings = Depends(get_settings),
 ) -> PredictResponse:
@@ -33,7 +33,7 @@ async def predict(
     if len(data) > settings.max_upload_bytes:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, f"Image must be at most {settings.max_upload_mb} MB")
 
-    if model is not None and model not in registry.age_models:
+    if model is not None and model not in registry.model_names:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown or unavailable model '{model}'")
 
     try:
