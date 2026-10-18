@@ -18,10 +18,11 @@ Three models were trained on [UTKFace](https://susanqq.github.io/UTKFace/) (ages
 | CNN | 128×128 grayscale | 6.16 years | 8.12 |
 | CNN + GAN augmentation | 128×128 grayscale | 5.83 years | 8.05 |
 | EfficientNetB0 (transfer learning) | 128×128 RGB | 4.97 years | 7.07 |
-| **EfficientNetB0 + FairFace** (see below) | 128×128 RGB | **4.83 years** | **6.80** |
+| EfficientNetB0 + FairFace (see below) | 128×128 RGB | 4.83 years | 6.80 |
+| **Ensemble** + flip + calibration (see below) | both | **4.65 years** | **6.60** |
 
 The first version of the notebook reached 6.3 years. Faces added by the conditional GAN improve the same CNN by 0.33 years.
-The web app uses EfficientNetB0 + FairFace by default, the best model on the validation set.
+The web app uses the ensemble by default.
 
 MAE by age group (years):
 
@@ -31,6 +32,28 @@ MAE by age group (years):
 | CNN + GAN | 4.28 | 4.71 | 3.74 | 5.79 | 7.55 | 8.98 | 10.14 |
 | EfficientNetB0 | 2.22 | 4.92 | 3.69 | 5.59 | 6.76 | 7.44 | 7.37 |
 | EfficientNetB0 + FairFace | 2.14 | 4.25 | 3.65 | 5.13 | 6.33 | 7.18 | 8.11 |
+| Ensemble + flip + calibration | 1.69 | 4.93 | 3.67 | 5.00 | 5.93 | 7.10 | 7.37 |
+
+### Reducing the error without retraining
+
+Three inference-time techniques, applied by both the backend and the in-browser engine. Each choice was fitted on
+the UTKFace validation set; the numbers below are on the test sets.
+
+| | UTKFace test MAE | FairFace years outside range |
+|---|---|---|
+| EfficientNetB0 + FairFace | 4.83 | 2.32 |
+| + **flip TTA**: average the prediction on the face and its mirror image | 4.81 | 2.28 |
+| + **ensemble**: 80% EfficientNetB0 + FairFace, 20% CNN + GAN | 4.72 | 2.36 |
+| + **isotonic calibration** of the ensemble output (`models/calibration.json`) | **4.65** | **2.35** |
+
+- CNN + GAN is weaker alone (5.83) but adds information the EfficientNet lacks; adding the UTKFace-only EfficientNet
+  to the ensemble instead improved UTKFace (4.62) but hurt diverse faces (FairFace 2.82), so it was left out.
+- All models regress towards the mean: they overestimate children (+2 years) and underestimate people over 60
+  (−6.7 years). Calibration halves the error for children (2.43 → 1.69) and reduces it for 60+ (8.13 → 7.37), at the
+  cost of ages 13–29 (13–19: 4.13 → 4.93).
+- Calibration improved the validation MAE more (4.55 → 4.30) than the test MAE (4.72 → 4.65): with 178 breakpoints
+  fitted on 1,890 faces it partly overfits, so the test number is the one to trust.
+- Single models in the web app also use flip TTA, so they are slightly better than the notebook numbers above.
 
 ### More diverse training data
 

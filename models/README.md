@@ -10,6 +10,7 @@ Trained weights go here. They are not committed to git; this folder is mounted r
 | `age_cnn.keras` | section 2 | `/api/predict?model=cnn` |
 | `gan_generator.keras` | section 3 | `/api/generate` |
 | `metrics.json` | section 6 | metrics in `/api/model-info`, choice of the default model |
+| `calibration.json` | ensemble calibration (see README) | correction applied to the ensemble's output; optional |
 
 Any subset works: missing models are reported by `/api/health` and the matching feature is disabled.
 The YuNet face detector is bundled with the backend (`backend/app/assets/`).
