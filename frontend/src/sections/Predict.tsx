@@ -195,7 +195,7 @@ function PhotoWithBoxes({ url, state, onFile, onWebcam, onReset }: {
             }}
           >
             <CornerMarks size="size-[18%]" />
-            <span className="absolute -top-7 left-0 bg-accent px-2 py-0.5 font-mono text-xs font-medium text-bg">
+            <span className="absolute -top-7 left-0 whitespace-nowrap bg-accent px-2 py-0.5 font-mono text-xs font-medium text-bg">
               #{i + 1} · <AgeCounter value={f.age} delay={i * 0.15} />
             </span>
           </motion.div>

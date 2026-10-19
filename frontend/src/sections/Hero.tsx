@@ -8,7 +8,7 @@ export function Hero({ info }: { info: ModelInfo | null }) {
   const best = info?.models.find((m) => m.name === info.default_model);
   const stats = [
     ["Data", "UTKFace + FairFace · 120k faces"],
-    ["Best test MAE", best?.test_mae != null ? `${best.test_mae.toFixed(1)} years` : "—"],
+    ["Best test MAE", best?.test_mae != null ? `${best.test_mae.toFixed(2)} years` : "—"],
     ["Models", "CNN · CNN+GAN · EfficientNet ×2"],
     ["Generator", "Conditional GAN"],
   ];
