@@ -5,6 +5,7 @@ import { CornerMarks } from "../components/CornerMarks";
 import { Dropzone } from "../components/Dropzone";
 import { SectionHeading } from "../components/SectionHeading";
 import { Webcam } from "../components/Webcam";
+import { readPickedFile } from "../lib/files";
 import {
   api, ApiError, IN_BROWSER, MAX_UPLOAD_MB, MODEL_LABELS, onModelDownload, pngSrc, type DownloadProgress,
   type Health, type ModelInfo, type ModelName, type PredictResponse,
@@ -56,7 +57,16 @@ export function Predict({ health, info, offline }: { health: Health | null; info
     setState({ kind: "loading" });
     // HEIC photos (iPhone, Samsung) are converted to JPEG first so they can be previewed and decoded
     const { toDecodableBlob } = await import("../lib/browser/imageops");
-    const blob = await toDecodableBlob(original);
+    let blob: Blob | null;
+    try {
+      blob = await toDecodableBlob(original);
+    } catch {
+      setState({
+        kind: "error",
+        message: "Your phone didn't let the browser read this photo. Save it to the gallery first, or take a picture with the camera.",
+      });
+      return;
+    }
     if (!blob) {
       setState({ kind: "error", message: "This photo's format can't be read in this browser. Try a JPG or PNG, or use the camera." });
       return;
@@ -174,7 +184,7 @@ function PhotoWithBoxes({ url, state, onFile, onWebcam, onReset }: {
           e.preventDefault();
           setDragging(false);
           const f = e.dataTransfer.files[0];
-          if (f) onFile(f);
+          if (f) void readPickedFile(f).then(onFile);
         }}
       >
         <img src={url} alt="Uploaded photo" className="block max-h-[70vh] max-w-full" />
@@ -243,10 +253,14 @@ function PhotoWithBoxes({ url, state, onFile, onWebcam, onReset }: {
         accept="image/*,.heic,.heif"
         className="sr-only"
         aria-label="Choose another photo"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onFile(f);
-          e.target.value = "";
+        onChange={async (e) => {
+          const input = e.target;
+          const f = input.files?.[0];
+          if (!f) return;
+          // Read before resetting the input: on Android, resetting it can revoke access to the photo
+          const copy = await readPickedFile(f);
+          input.value = "";
+          onFile(copy);
         }}
       />
     </div>

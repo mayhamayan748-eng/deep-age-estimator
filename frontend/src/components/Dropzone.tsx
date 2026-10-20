@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { MAX_UPLOAD_MB } from "../lib/api";
+import { readPickedFile } from "../lib/files";
 
 export function Dropzone({ onFile, onWebcam }: { onFile: (f: File) => void; onWebcam: () => void }) {
   const [dragging, setDragging] = useState(false);
@@ -16,7 +17,7 @@ export function Dropzone({ onFile, onWebcam }: { onFile: (f: File) => void; onWe
         e.preventDefault();
         setDragging(false);
         const f = e.dataTransfer.files[0];
-        if (f) onFile(f);
+        if (f) void readPickedFile(f).then(onFile);
       }}
       className={`relative flex aspect-[4/3] flex-col items-center justify-center gap-5 border border-dashed p-6 text-center transition-colors ${
         dragging ? "border-accent bg-accent-soft" : "border-line bg-surface"
@@ -53,10 +54,14 @@ export function Dropzone({ onFile, onWebcam }: { onFile: (f: File) => void; onWe
         accept="image/*,.heic,.heif"
         className="sr-only"
         aria-label="Upload a photo"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onFile(f);
-          e.target.value = "";
+        onChange={async (e) => {
+          const input = e.target;
+          const f = input.files?.[0];
+          if (!f) return;
+          // Read before resetting the input: on Android, resetting it can revoke access to the photo
+          const copy = await readPickedFile(f);
+          input.value = "";
+          onFile(copy);
         }}
       />
     </div>
