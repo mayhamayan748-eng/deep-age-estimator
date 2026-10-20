@@ -126,8 +126,29 @@ async function inBrowser<T>(call: (e: Awaited<ReturnType<typeof engine>>) => Pro
     return await call(e);
   } catch (err) {
     if (err instanceof e.BrowserError) throw new ApiError(err.status, err.message);
-    throw new ApiError(0, "Couldn't load or run the model in this browser. Check your connection and try again.");
+    console.error(err);
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new ApiError(
+      0,
+      `Couldn't load or run the model in this browser. Check your connection and try again. (${reason.slice(0, 160)})`,
+    );
   }
+}
+
+export type DownloadProgress = { loaded: number; total: number; active: number };
+
+/** Model download progress (browser mode only); returns an unsubscribe function. */
+export function onModelDownload(cb: (p: DownloadProgress) => void): () => void {
+  if (!IN_BROWSER) return () => {};
+  let unsubscribe = () => {};
+  let cancelled = false;
+  void engine().then((e) => {
+    if (!cancelled) unsubscribe = e.subscribeDownload(cb);
+  });
+  return () => {
+    cancelled = true;
+    unsubscribe();
+  };
 }
 
 export const api: typeof serverApi = IN_BROWSER

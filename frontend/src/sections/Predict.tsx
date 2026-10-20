@@ -6,7 +6,7 @@ import { Dropzone } from "../components/Dropzone";
 import { SectionHeading } from "../components/SectionHeading";
 import { Webcam } from "../components/Webcam";
 import {
-  api, ApiError, IN_BROWSER, MAX_UPLOAD_MB, MODEL_LABELS, pngSrc,
+  api, ApiError, IN_BROWSER, MAX_UPLOAD_MB, MODEL_LABELS, onModelDownload, pngSrc, type DownloadProgress,
   type Health, type ModelInfo, type ModelName, type PredictResponse,
 } from "../lib/api";
 
@@ -265,7 +265,7 @@ function Results({ state, mae, hasImage, onRetry }: { state: State; mae: number;
   if (state.kind === "loading") {
     return (
       <div className="flex flex-col gap-3" aria-busy="true">
-        <p className="label">{IN_BROWSER ? "Running the model in your browser…" : "Detecting faces…"}</p>
+        <p className="label">{IN_BROWSER ? <BrowserLoadingLabel /> : "Detecting faces…"}</p>
         {[0, 1].map((i) => (
           <div key={i} className="flex animate-pulse gap-4 border border-line p-4">
             <div className="size-24 bg-surface-2" />
@@ -335,4 +335,15 @@ function Results({ state, mae, hasImage, onRetry }: { state: State; mae: number;
       </AnimatePresence>
     </div>
   );
+}
+
+/** "Downloading models… 12 / 25 MB" while model files arrive (first visit), then "Running the model…". */
+function BrowserLoadingLabel() {
+  const [p, setP] = useState<DownloadProgress>({ loaded: 0, total: 0, active: 0 });
+  useEffect(() => onModelDownload(setP), []);
+  if (p.active > 0 && p.total > 0) {
+    const mb = (n: number) => (n / 1024 / 1024).toFixed(0);
+    return <>Downloading models (first visit only)… {mb(p.loaded)} / {mb(p.total)} MB</>;
+  }
+  return <>Running the model in your browser…</>;
 }

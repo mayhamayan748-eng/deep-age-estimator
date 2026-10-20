@@ -14,8 +14,11 @@ ort.env.wasm.wasmPaths = { wasm: wasmUrl, mjs: mjsUrl };
 ort.env.wasm.numThreads = 1;
 
 const MODEL_BASE = (import.meta.env.VITE_MODEL_BASE ?? `${import.meta.env.BASE_URL}models/`).replace(/\/?$/, "/");
-// Static hosts send no cache headers, so each build gets its own URLs for models and data
-const versioned = (file: string) => `${MODEL_BASE}${file}?v=${__BUILD_ID__}`;
+// Static hosts send no cache headers. Data files get a per-build URL; model files get a URL tied to their
+// content hash (metrics.json "file_versions", written by deploy_static.py), so a redeploy doesn't make
+// phones download ~40 MB of unchanged models again.
+let fileVersions: Record<string, string> = {};
+const versioned = (file: string) => `${MODEL_BASE}${file}?v=${fileVersions[file] ?? __BUILD_ID__}`;
 
 // Same constants as backend/app/services/preprocessing.py
 const IMG_SIZE = 128;
@@ -53,11 +56,56 @@ class BrowserError extends Error {
   }
 }
 
+// Download progress across all model files, so the page can show it on slow (mobile) connections
+export type DownloadProgress = { loaded: number; total: number; active: number };
+const progress: DownloadProgress = { loaded: 0, total: 0, active: 0 };
+const listeners = new Set<(p: DownloadProgress) => void>();
+const notify = () => listeners.forEach((cb) => cb({ ...progress }));
+
+function subscribeDownload(cb: (p: DownloadProgress) => void): () => void {
+  listeners.add(cb);
+  cb({ ...progress });
+  return () => listeners.delete(cb);
+}
+
+async function download(file: string): Promise<Uint8Array> {
+  const res = await fetch(versioned(file));
+  if (!res.ok || !res.body) throw new Error(`Failed to download ${file} (HTTP ${res.status})`);
+  const size = Number(res.headers.get("content-length")) || 0;
+  progress.total += size;
+  progress.active++;
+  notify();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  try {
+    const reader = res.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      progress.loaded += value.length;
+      notify();
+    }
+  } finally {
+    progress.active--;
+    if (size) progress.loaded += size - received; // keep totals consistent if the stream ended early
+    notify();
+  }
+  const out = new Uint8Array(received);
+  let offset = 0;
+  for (const c of chunks) {
+    out.set(c, offset);
+    offset += c.length;
+  }
+  return out;
+}
+
 // Each model is downloaded once, on first use
 const sessions = new Map<string, Promise<ort.InferenceSession>>();
 function session(file: string): Promise<ort.InferenceSession> {
   if (!sessions.has(file)) {
-    const s = ort.InferenceSession.create(versioned(file), { executionProviders: ["wasm"] });
+    const s = download(file).then((bytes) => ort.InferenceSession.create(bytes, { executionProviders: ["wasm"] }));
     s.catch(() => sessions.delete(file));
     sessions.set(file, s);
   }
@@ -65,6 +113,7 @@ function session(file: string): Promise<ort.InferenceSession> {
 }
 
 interface Metrics {
+  file_versions?: Record<string, string>;
   dataset: Record<string, unknown>;
   best_model: ModelName;
   gan: Record<string, unknown>;
@@ -73,7 +122,12 @@ interface Metrics {
 }
 let metricsPromise: Promise<Metrics> | null = null;
 const metrics = (): Promise<Metrics> =>
-  (metricsPromise ??= fetch(versioned("metrics.json")).then((r) => r.json() as Promise<Metrics>));
+  (metricsPromise ??= fetch(versioned("metrics.json"))
+    .then((r) => r.json() as Promise<Metrics>)
+    .then((m) => {
+      fileVersions = m.file_versions ?? {};
+      return m;
+    }));
 
 // Optional monotonic correction of the ensemble output (calibration.json, same file the backend uses)
 type Calibration = { x: number[]; y: number[] } | null;
@@ -262,4 +316,4 @@ async function generate(age: number, count: number, seed?: number): Promise<Gene
   return { age, seed: usedSeed, images };
 }
 
-export const browserApi = { health, modelInfo, predict, generate, BrowserError };
+export const browserApi = { health, modelInfo, predict, generate, subscribeDownload, BrowserError };

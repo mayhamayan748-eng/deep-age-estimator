@@ -16,9 +16,19 @@ export function Generate({ health, offline }: { health: Health | null; offline: 
   const requestId = useRef(0);
 
   const available = !offline && health?.generator === true;
+  const sectionRef = useRef<HTMLElement>(null);
+  // The generator model is large; don't download it until the visitor scrolls near this section
+  const [nearView, setNearView] = useState(false);
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || nearView) return;
+    const io = new IntersectionObserver(([entry]) => entry.isIntersecting && setNearView(true), { rootMargin: "300px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [nearView]);
 
   useEffect(() => {
-    if (!available) return;
+    if (!available || !nearView) return;
     const id = ++requestId.current;
     const timer = setTimeout(async () => {
       setLoading(true);
@@ -33,10 +43,10 @@ export function Generate({ health, offline }: { health: Health | null; offline: 
       }
     }, 250); // debounce slider drags
     return () => clearTimeout(timer);
-  }, [age, count, seed, available]);
+  }, [age, count, seed, available, nearView]);
 
   return (
-    <section id="generate" className="border-b border-line bg-surface">
+    <section id="generate" ref={sectionRef} className="border-b border-line bg-surface">
       <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-28">
         <SectionHeading index="02" kicker="Generate" title={<>Now run it <em className="text-accent">backwards</em>.</>}>
           A conditional GAN learned to draw faces for a requested age. Drag the ruler: the random seed stays the same,

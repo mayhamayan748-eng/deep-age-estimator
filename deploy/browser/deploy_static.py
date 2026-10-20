@@ -7,6 +7,8 @@
 Use --build-only to just produce frontend/dist (serve it with any static file server to test).
 """
 import argparse
+import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -48,6 +50,13 @@ def build() -> None:
     models.mkdir()
     for f in REQUIRED:
         shutil.copy(ONNX_DIR / f, models / f)
+    # Content hashes let the site version model URLs, so browsers only re-download models that changed
+    metrics_path = models / "metrics.json"
+    metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    metrics["file_versions"] = {
+        f: hashlib.sha256((models / f).read_bytes()).hexdigest()[:12] for f in REQUIRED if f.endswith(".onnx")
+    }
+    metrics_path.write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")
     (DIST / "README.md").write_text(SPACE_README, encoding="utf-8")
 
 

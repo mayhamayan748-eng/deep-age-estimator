@@ -139,7 +139,7 @@ export function crop(src: Image, x0: number, y0: number, x1: number, y1: number)
 
 // Phone cameras take 48-50 MP photos; mobile browsers cap canvas size (iOS Safari: ~16.7 MP) and memory.
 // Larger photos are scaled down to this side length first, which is plenty to find and crop faces.
-const MAX_DECODE_SIDE = 2560;
+const MAX_DECODE_SIDE = 2048;
 
 type Canvas2D = { canvas: OffscreenCanvas | HTMLCanvasElement; ctx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D };
 
