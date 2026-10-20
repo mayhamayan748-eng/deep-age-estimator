@@ -42,16 +42,25 @@ export function Predict({ health, info, offline }: { health: Health | null; info
     }
   }, []);
 
-  const accept = (blob: Blob) => {
-    if (!blob.type.startsWith("image/")) {
+  const accept = async (original: Blob) => {
+    // Some phones hand over photos with an empty MIME type, so only reject types that are clearly not images
+    if (original.type && !original.type.startsWith("image/")) {
       setState({ kind: "error", message: "That file isn't an image. Try a JPG, PNG or WebP." });
       return;
     }
-    if (blob.size > MAX_UPLOAD_MB * 1024 * 1024) {
+    if (original.size > MAX_UPLOAD_MB * 1024 * 1024) {
       setState({ kind: "error", message: `That image is larger than ${MAX_UPLOAD_MB} MB.` });
       return;
     }
     setWebcam(false);
+    setState({ kind: "loading" });
+    // HEIC photos (iPhone, Samsung) are converted to JPEG first so they can be previewed and decoded
+    const { toDecodableBlob } = await import("../lib/browser/imageops");
+    const blob = await toDecodableBlob(original);
+    if (!blob) {
+      setState({ kind: "error", message: "This photo's format can't be read in this browser. Try a JPG or PNG, or use the camera." });
+      return;
+    }
     setImage({ blob, url: URL.createObjectURL(blob) });
     void run(blob, model);
   };
@@ -231,7 +240,7 @@ function PhotoWithBoxes({ url, state, onFile, onWebcam, onReset }: {
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif"
         className="sr-only"
         aria-label="Choose another photo"
         onChange={(e) => {

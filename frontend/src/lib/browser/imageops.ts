@@ -137,23 +137,99 @@ export function crop(src: Image, x0: number, y0: number, x1: number, y1: number)
   return { data: out, width: w, height: h, channels: cn };
 }
 
-/** Decode a photo into BGR pixels the way cv2.imdecode does: EXIF orientation applied, no colour management. */
-export async function decodeImage(blob: Blob): Promise<Image | null> {
-  let bitmap: ImageBitmap;
+// Phone cameras take 48-50 MP photos; mobile browsers cap canvas size (iOS Safari: ~16.7 MP) and memory.
+// Larger photos are scaled down to this side length first, which is plenty to find and crop faces.
+const MAX_DECODE_SIDE = 2560;
+
+type Canvas2D = { canvas: OffscreenCanvas | HTMLCanvasElement; ctx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D };
+
+/** OffscreenCanvas where supported (Safari < 16.4 has none), otherwise a detached <canvas>. */
+function makeCanvas(width: number, height: number): Canvas2D {
+  if (typeof OffscreenCanvas !== "undefined") {
+    const canvas = new OffscreenCanvas(width, height);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (ctx) return { canvas, ctx };
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  return { canvas, ctx: canvas.getContext("2d", { willReadFrequently: true })! };
+}
+
+function canvasToBlob(canvas: OffscreenCanvas | HTMLCanvasElement, type: string): Promise<Blob> {
+  if ("convertToBlob" in canvas) return canvas.convertToBlob({ type });
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), type),
+  );
+}
+
+/** HEIC/HEIF (default on many iPhones and Samsung phones): sniffed from the file header, since the MIME type is often empty. */
+async function isHeic(blob: Blob): Promise<boolean> {
+  if (/hei[cf]/i.test(blob.type) || (blob instanceof File && /\.hei[cf]$/i.test(blob.name))) return true;
+  const head = new Uint8Array(await blob.slice(4, 12).arrayBuffer());
+  const brand = String.fromCharCode(...head);
+  return brand.startsWith("ftyp") && /^(heic|heix|hevc|hevx|heim|heis|mif1|msf1)$/.test(brand.slice(4));
+}
+
+type Source = { src: CanvasImageSource; width: number; height: number; release: () => void };
+
+/** Tries the decoders browsers actually support, most faithful first. */
+async function loadSource(blob: Blob): Promise<Source | null> {
+  const attempts: (() => Promise<ImageBitmap>)[] = [
+    // Matches cv2.imdecode: EXIF orientation applied, no colour management
+    () => createImageBitmap(blob, { imageOrientation: "from-image", colorSpaceConversion: "none", premultiplyAlpha: "none" }),
+    // Older mobile browsers reject some options
+    () => createImageBitmap(blob),
+  ];
+  if (typeof createImageBitmap === "function") {
+    for (const attempt of attempts) {
+      try {
+        const bmp = await attempt();
+        return { src: bmp, width: bmp.width, height: bmp.height, release: () => bmp.close() };
+      } catch {
+        /* try the next decoder */
+      }
+    }
+  }
+  // Last resort: the <img> decoder, which every browser has
+  const url = URL.createObjectURL(blob);
   try {
-    bitmap = await createImageBitmap(blob, {
-      imageOrientation: "from-image",
-      colorSpaceConversion: "none",
-      premultiplyAlpha: "none",
-    });
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    return { src: img, width: img.naturalWidth, height: img.naturalHeight, release: () => URL.revokeObjectURL(url) };
+  } catch {
+    URL.revokeObjectURL(url);
+    return null;
+  }
+}
+
+/** Converts HEIC to JPEG if needed; null when the format can't be read. */
+export async function toDecodableBlob(blob: Blob): Promise<Blob | null> {
+  if (!(await isHeic(blob))) return blob;
+  try {
+    const { default: heic2any } = await import("heic2any"); // ~1 MB, loaded only for HEIC photos
+    const out = await heic2any({ blob, toType: "image/jpeg", quality: 0.95 });
+    return Array.isArray(out) ? out[0] : out;
   } catch {
     return null;
   }
-  const { width, height } = bitmap;
-  const canvas = new OffscreenCanvas(width, height);
-  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
-  ctx.drawImage(bitmap, 0, 0);
-  bitmap.close();
+}
+
+/** Decode a photo into BGR pixels the way cv2.imdecode does: EXIF orientation applied, no colour management. */
+export async function decodeImage(blob: Blob): Promise<Image | null> {
+  const readable = await toDecodableBlob(blob);
+  const source = readable && (await loadSource(readable));
+  if (!source) return null;
+
+  const scale = Math.min(1, MAX_DECODE_SIDE / Math.max(source.width, source.height));
+  const width = Math.max(1, Math.round(source.width * scale));
+  const height = Math.max(1, Math.round(source.height * scale));
+  const { ctx } = makeCanvas(width, height);
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(source.src, 0, 0, width, height);
+  source.release();
+
   const rgba = ctx.getImageData(0, 0, width, height).data;
   const bgr = new Uint8Array(width * height * 3);
   for (let i = 0, j = 0; i < rgba.length; i += 4, j += 3) {
@@ -166,15 +242,14 @@ export async function decodeImage(blob: Blob): Promise<Image | null> {
 
 /** PNG as base64 (no data: prefix), for a gray or RGB image. */
 export async function encodePngBase64(img: Image): Promise<string> {
-  const canvas = new OffscreenCanvas(img.width, img.height);
-  const ctx = canvas.getContext("2d")!;
+  const { canvas, ctx } = makeCanvas(img.width, img.height);
   const imageData = ctx.createImageData(img.width, img.height);
   for (let i = 0, j = 0; i < img.width * img.height; i++, j += img.channels) {
     const r = img.data[j], g = img.channels === 3 ? img.data[j + 1] : r, b = img.channels === 3 ? img.data[j + 2] : r;
     imageData.data.set([r, g, b, 255], i * 4);
   }
   ctx.putImageData(imageData, 0, 0);
-  const blob = await canvas.convertToBlob({ type: "image/png" });
+  const blob = await canvasToBlob(canvas, "image/png");
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let binary = "";
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));

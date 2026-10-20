@@ -1,7 +1,11 @@
 // Relative by default so the nginx /api proxy works; override with VITE_API_BASE for a separate API host
 const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
 
-export const MAX_UPLOAD_MB = 5;
+/** VITE_INFERENCE=browser: run the models in the visitor's browser (static hosting, no backend). */
+export const IN_BROWSER = import.meta.env.VITE_INFERENCE === "browser";
+
+// The API caps uploads at 5 MB; in the browser nothing is uploaded, so full-size phone photos are fine
+export const MAX_UPLOAD_MB = IN_BROWSER ? 25 : 5;
 
 export type ModelName = "ensemble" | "efficientnet_diverse" | "efficientnet" | "cnn_gan" | "cnn";
 
@@ -112,9 +116,6 @@ const serverApi = {
       body: JSON.stringify({ age, count, seed }),
     }),
 };
-
-/** VITE_INFERENCE=browser: run the models in the visitor's browser (static hosting, no backend). */
-export const IN_BROWSER = import.meta.env.VITE_INFERENCE === "browser";
 
 // Loaded only in browser mode, so the server build doesn't ship onnxruntime
 const engine = () => import("./browser/engine").then((m) => m.browserApi);

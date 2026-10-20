@@ -50,7 +50,7 @@ export function Dropzone({ onFile, onWebcam }: { onFile: (f: File) => void; onWe
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif"
         className="sr-only"
         aria-label="Upload a photo"
         onChange={(e) => {
