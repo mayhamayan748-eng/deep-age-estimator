@@ -42,9 +42,10 @@
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-amber: var(--amber);
-  --font-display: "Instrument Serif", ui-serif, Georgia, serif;
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  /* Latin glyphs use the first font; Arabic glyphs fall through to the Arabic font after it */
+  --font-display: "Instrument Serif", "Noto Naskh Arabic", ui-serif, Georgia, serif;
+  --font-sans: "IBM Plex Sans", "IBM Plex Sans Arabic", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "IBM Plex Sans Arabic", ui-monospace, monospace;
 }
 
 html {
@@ -120,6 +121,22 @@ body::after {
   background-image: radial-gradient(circle, var(--bg) 0 3px, transparent 3.5px);
   background-size: 18px 12px;
   background-repeat: repeat-x;
+}
+
+/* Arabic: letter-spacing breaks the joining of Arabic letters, and Arabic has no italics or capitals */
+:root[lang="ar"] .label {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 0.8125rem;
+}
+:root[lang="ar"] em,
+:root[lang="ar"] .italic {
+  font-style: normal;
+}
+/* Naskh has tall ascenders and descenders: give display headings room */
+:root[lang="ar"] h1,
+:root[lang="ar"] h2 {
+  line-height: 1.35;
 }
 
 @media (prefers-reduced-motion: reduce) {

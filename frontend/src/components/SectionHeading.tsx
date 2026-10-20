@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 export function SectionHeading({ index, kicker, title, children }: {
   index: string;
   kicker: string;
-  title: ReactNode;
+  title: ReactNode | readonly [string, string, string];
   children?: ReactNode;
 }) {
   return (
@@ -20,7 +20,17 @@ export function SectionHeading({ index, kicker, title, children }: {
         <span className="h-px w-8 bg-line" />
         {kicker}
       </p>
-      <h2 className="font-display text-4xl leading-[1.05] sm:text-5xl">{title}</h2>
+      <h2 className="font-display text-4xl leading-[1.05] sm:text-5xl">
+        {Array.isArray(title) ? (
+          <>
+            {title[0]}
+            <em className="text-accent">{title[1]}</em>
+            {title[2]}
+          </>
+        ) : (
+          title
+        )}
+      </h2>
       {children && <p className="mt-4 text-muted">{children}</p>}
     </motion.div>
   );

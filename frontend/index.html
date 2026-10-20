@@ -9,15 +9,22 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=Noto+Naskh+Arabic:wght@500;600&display=swap"
       rel="stylesheet"
     />
     <script>
-      // Apply the saved theme before first paint
+      // Apply the saved theme and language before first paint
       try {
         const t = localStorage.getItem("theme");
         if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
       } catch {}
+      (function () {
+        let lang = null;
+        try { lang = localStorage.getItem("lang"); } catch {}
+        if (lang !== "ar" && lang !== "en") lang = (navigator.language || "").toLowerCase().startsWith("ar") ? "ar" : "en";
+        document.documentElement.lang = lang;
+        document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+      })();
     </script>
   </head>
   <body>

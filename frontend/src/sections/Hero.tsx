@@ -1,18 +1,20 @@
 import { motion } from "motion/react";
 import { CornerMarks } from "../components/CornerMarks";
+import { useT } from "../i18n";
 import type { ModelInfo } from "../lib/api";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
 export function Hero({ info }: { info: ModelInfo | null }) {
+  const t = useT();
   const best = info?.models.find((m) => m.name === info.default_model);
   const stats = [
-    ["Data", "UTKFace + FairFace · 120k faces"],
-    ["Best test MAE", best?.test_mae != null ? `${best.test_mae.toFixed(2)} years` : "—"],
-    ["Models", "CNN · CNN+GAN · EfficientNet ×2"],
-    ["Generator", "Conditional GAN"],
+    [t.hero.statData, t.hero.statDataValue],
+    [t.hero.statMae, best?.test_mae != null ? t.hero.statMaeValue(best.test_mae.toFixed(2)) : "—"],
+    [t.hero.statModels, t.hero.statModelsValue],
+    [t.hero.statGenerator, t.hero.statGeneratorValue],
   ];
-  const headline = ["How", "old", "does", "a", "machine", "think", "you", "are?"];
+  const headline = t.hero.headline;
 
   return (
     <section id="top" className="relative overflow-hidden border-b border-line">
@@ -24,17 +26,19 @@ export function Hero({ info }: { info: ModelInfo | null }) {
             transition={{ duration: 0.6 }}
             className="label mb-6 flex items-center gap-3"
           >
-            <span className="size-1.5 rounded-full bg-accent" /> Graduation project · Deep learning
+            <span className="size-1.5 rounded-full bg-accent" /> {t.hero.kicker}
           </motion.p>
 
-          <h1 className="font-display text-5xl leading-[0.95] sm:text-7xl">
+          {/* Words are animated one by one; the label gives screen readers the sentence with its spaces */}
+          <h1 className="font-display text-5xl leading-[0.95] sm:text-7xl" aria-label={headline.join(" ")}>
             {headline.map((word, i) => (
               <motion.span
-                key={i}
+                aria-hidden
+                key={`${word}-${i}`}
                 initial={{ opacity: 0, y: "0.4em" }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 0.1 + i * 0.06, ease }}
-                className={`me-[0.22em] inline-block ${word === "machine" ? "italic text-accent" : ""}`}
+                className={`me-[0.22em] inline-block ${i === t.hero.accentWord ? "italic text-accent" : ""}`}
               >
                 {word}
               </motion.span>
@@ -47,8 +51,7 @@ export function Hero({ info }: { info: ModelInfo | null }) {
             transition={{ duration: 0.7, delay: 0.7, ease }}
             className="mt-6 max-w-xl text-lg text-muted"
           >
-            Upload a photo and neural networks trained on up to 120,000 faces from many regions estimate the age of everyone in it.
-            Then flip the process: ask a GAN to imagine a face of any age.
+            {t.hero.sub}
           </motion.p>
 
           <motion.div
@@ -58,10 +61,10 @@ export function Hero({ info }: { info: ModelInfo | null }) {
             className="mt-8 flex flex-wrap gap-3"
           >
             <a href="#predict" className="rounded-full bg-accent px-6 py-3 font-medium text-bg transition-transform hover:-translate-y-0.5">
-              Estimate an age
+              {t.hero.ctaEstimate}
             </a>
             <a href="#generate" className="rounded-full border border-line px-6 py-3 font-medium transition-colors hover:border-accent">
-              Generate faces
+              {t.hero.ctaGenerate}
             </a>
           </motion.div>
         </div>
@@ -78,7 +81,7 @@ export function Hero({ info }: { info: ModelInfo | null }) {
         {stats.map(([k, v]) => (
           <div key={k} className="border-line py-5 pe-4 [&:not(:last-child)]:lg:border-e">
             <dt className="label">{k}</dt>
-            <dd className="mt-1 font-mono text-sm">{v}</dd>
+            <dd className="mt-1 font-mono text-sm" dir="auto">{v}</dd>
           </div>
         ))}
       </motion.dl>

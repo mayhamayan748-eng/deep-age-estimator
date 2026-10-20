@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { CornerMarks } from "./CornerMarks";
+import { useT } from "../i18n";
 
 export function Webcam({ onCapture, onCancel }: { onCapture: (b: Blob) => void; onCancel: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [error, setError] = useState<string | null>(null);
+  const t = useT();
+  const [error, setError] = useState<"unsupported" | "denied" | null>(null);
   const [ready, setReady] = useState(false);
   // Front cameras are shown like a mirror, as phone camera apps do; a rear camera is shown as is
   const [mirrored, setMirrored] = useState(true);
@@ -12,7 +14,7 @@ export function Webcam({ onCapture, onCancel }: { onCapture: (b: Blob) => void; 
     let stream: MediaStream | null = null;
     let cancelled = false;
     if (!navigator.mediaDevices?.getUserMedia) {
-      setError("This browser doesn't support camera access (it needs HTTPS or localhost).");
+      setError("unsupported");
       return;
     }
     navigator.mediaDevices
@@ -23,7 +25,7 @@ export function Webcam({ onCapture, onCancel }: { onCapture: (b: Blob) => void; 
         setMirrored(s.getVideoTracks()[0]?.getSettings().facingMode !== "environment");
         if (videoRef.current) videoRef.current.srcObject = s;
       })
-      .catch(() => setError("Camera access was denied or no camera was found."));
+      .catch(() => setError("denied"));
     return () => {
       cancelled = true;
       stream?.getTracks().forEach((t) => t.stop());
@@ -51,7 +53,7 @@ export function Webcam({ onCapture, onCancel }: { onCapture: (b: Blob) => void; 
     <div className="flex flex-col gap-4">
       <div className="relative aspect-[4/3] overflow-hidden bg-surface">
         {error ? (
-          <p className="absolute inset-0 grid place-items-center p-6 text-center text-muted">{error}</p>
+          <p className="absolute inset-0 grid place-items-center p-6 text-center text-muted">{t.webcam[error]}</p>
         ) : (
           <video
             ref={videoRef}
@@ -71,10 +73,10 @@ export function Webcam({ onCapture, onCancel }: { onCapture: (b: Blob) => void; 
           disabled={!ready}
           className="rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-bg disabled:opacity-40"
         >
-          Capture
+          {t.webcam.capture}
         </button>
         <button type="button" onClick={onCancel} className="rounded-full border border-line px-5 py-2.5 text-sm font-medium">
-          Cancel
+          {t.webcam.cancel}
         </button>
       </div>
     </div>

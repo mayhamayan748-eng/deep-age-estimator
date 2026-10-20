@@ -1,22 +1,19 @@
 import { useTheme } from "../hooks/useTheme";
+import { useLang } from "../i18n";
 import { IN_BROWSER, type Health } from "../lib/api";
 
-const NAV = [
-  ["predict", "Predict"],
-  ["generate", "Generate"],
-  ["how", "How it works"],
-  ["about", "About"],
-] as const;
+const NAV = ["predict", "generate", "how", "about"] as const;
 
 export function Header({ health, offline }: { health: Health | null; offline: boolean }) {
   const { theme, toggle } = useTheme();
+  const { t, toggle: toggleLang } = useLang();
   const status = offline ? "offline" : !health ? "connecting" : health.status === "ok" ? "online" : "degraded";
   const dot = { online: "bg-emerald-500", degraded: "bg-amber", offline: "bg-accent", connecting: "bg-muted animate-pulse" }[status];
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-bg/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
-        <a href="#top" className="flex items-center gap-2 font-mono text-sm font-medium tracking-tight">
+        <a href="#top" dir="ltr" className="flex items-center gap-2 font-mono text-sm font-medium tracking-tight">
           <svg viewBox="0 0 32 32" className="size-6" aria-hidden>
             <path d="M7 11V7h4M21 7h4v4M25 21v4h-4M11 25H7v-4" stroke="currentColor" strokeWidth="2.5" fill="none" />
             <circle cx="16" cy="16" r="3" className="fill-accent" />
@@ -25,22 +22,31 @@ export function Header({ health, offline }: { health: Health | null; offline: bo
         </a>
 
         <nav aria-label="Sections" className="ms-auto hidden gap-6 md:flex">
-          {NAV.map(([id, label]) => (
+          {NAV.map((id) => (
             <a key={id} href={`#${id}`} className="label transition-colors hover:text-text">
-              {label}
+              {t.nav[id]}
             </a>
           ))}
         </nav>
 
         <div className="ms-auto flex items-center gap-3 md:ms-6">
-          <span className="label hidden items-center gap-2 sm:flex" title={`API ${status}`}>
+          <span className="label hidden items-center gap-2 sm:flex">
             <span className={`size-1.5 rounded-full ${dot}`} />
-            {IN_BROWSER ? `models ${status === "online" ? "ready" : status}` : `API ${status}`}
+            {t.header.status(status, IN_BROWSER)}
           </span>
           <button
             type="button"
+            onClick={toggleLang}
+            aria-label={t.header.langAria}
+            title={t.header.langAria}
+            className="grid h-9 min-w-9 place-items-center rounded-full border border-line px-2.5 text-sm font-medium text-muted transition-colors hover:border-accent hover:text-text"
+          >
+            {t.header.langButton}
+          </button>
+          <button
+            type="button"
             onClick={toggle}
-            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+            aria-label={theme === "dark" ? t.header.toLight : t.header.toDark}
             className="grid size-9 place-items-center rounded-full border border-line text-muted transition-colors hover:border-accent hover:text-text"
           >
             {theme === "dark" ? (

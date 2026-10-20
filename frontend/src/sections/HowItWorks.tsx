@@ -1,22 +1,17 @@
 import { motion } from "motion/react";
 import { SectionHeading } from "../components/SectionHeading";
+import { useT } from "../i18n";
 import { MODEL_LABELS, type FairFaceGroup, type ModelInfo } from "../lib/api";
 
 const BAR_COLORS = ["bg-accent", "bg-amber", "bg-muted", "bg-text", "bg-line"];
 
-const STEPS = [
-  ["Upload", "Any photo, up to 5 MB. Phone pictures, group shots and webcam captures all work."],
-  ["Face detect", "OpenCV's YuNet network finds every face with ≥ 70% confidence."],
-  ["Preprocess", "Each face is cropped tightly, the way UTKFace photos are framed, and resized to 128×128 — grayscale for the CNNs, colour for EfficientNet."],
-  ["CNN", "The network outputs a number between 0 and 1: its estimate of age ÷ 90."],
-  ["Age", "Multiply by 90 and you get years. The typical error is shown next to every result."],
-] as const;
 
 export function HowItWorks({ info }: { info: ModelInfo | null }) {
+  const t = useT();
   return (
     <section id="how" className="border-b border-line">
       <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-28">
-        <SectionHeading index="03" kicker="How it works" title={<>Five steps from pixels to <em className="text-accent">years</em>.</>} />
+        <SectionHeading index="03" kicker={t.how.kicker} title={t.how.title} />
 
         <ol className="relative grid gap-4 md:grid-cols-5 md:gap-0">
           {/* connector line drawn as the section scrolls in */}
@@ -28,7 +23,7 @@ export function HowItWorks({ info }: { info: ModelInfo | null }) {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
           />
-          {STEPS.map(([title, text], i) => (
+          {t.how.steps.map(([title, text], i) => (
             <motion.li
               key={title}
               initial={{ opacity: 0, y: 24 }}
@@ -55,12 +50,13 @@ export function HowItWorks({ info }: { info: ModelInfo | null }) {
 }
 
 function Metrics({ info }: { info: ModelInfo | null }) {
+  const t = useT();
   if (!info) {
-    return <div className="mt-16 h-48 animate-pulse bg-surface" aria-label="Loading metrics" />;
+    return <div className="mt-16 h-48 animate-pulse bg-surface" aria-label={t.how.loadingMetrics} />;
   }
   const models = info.models.filter((m) => m.test_mae != null);
   if (models.length === 0) {
-    return <p className="mt-16 text-muted">Metrics will appear here once metrics.json is placed in ./models.</p>;
+    return <p className="mt-16 text-muted">{t.how.metricsMissing}</p>;
   }
   const groups = Object.keys(models[0].mae_by_age_group);
   const maxErr = Math.max(...models.flatMap((m) => Object.values(m.mae_by_age_group)));
@@ -75,13 +71,13 @@ function Metrics({ info }: { info: ModelInfo | null }) {
         transition={{ duration: 0.6 }}
       >
         <h3 className="label mb-4">
-          Results on {typeof info.dataset.test === "number" ? info.dataset.test.toLocaleString("en") : ""} unseen test faces
+          {t.how.resultsOn(typeof info.dataset.test === "number" ? info.dataset.test.toLocaleString("en") : "")}
         </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-start font-mono text-sm">
             <thead>
               <tr className="border-b border-line text-muted">
-                <th scope="col" className="py-2 text-start font-normal">Model</th>
+                <th scope="col" className="py-2 text-start font-normal">{t.how.colModel}</th>
                 <th scope="col" className="py-2 text-end font-normal">MAE</th>
                 <th scope="col" className="py-2 text-end font-normal">RMSE</th>
               </tr>
@@ -91,20 +87,16 @@ function Metrics({ info }: { info: ModelInfo | null }) {
                 <tr key={m.name} className="border-b border-line">
                   <th scope="row" className="py-3 text-start font-normal">
                     {MODEL_LABELS[m.name]}
-                    {m.name === info.default_model && <span className="ms-2 text-accent">★ in use</span>}
+                    {m.name === info.default_model && <span className="ms-2 text-accent">{t.how.inUse}</span>}
                   </th>
-                  <td className="py-3 text-end">{m.test_mae!.toFixed(2)} y</td>
-                  <td className="py-3 text-end">{m.test_rmse?.toFixed(2)} y</td>
+                  <td className="py-3 text-end">{m.test_mae!.toFixed(2)} {t.how.y}</td>
+                  <td className="py-3 text-end">{m.test_rmse?.toFixed(2)} {t.how.y}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-xs text-muted">
-          MAE: average distance between the predicted and real age. RMSE punishes large mistakes more.
-          ★ default model. Ensemble weights and its calibration were fitted on the validation set; all
-          numbers here are on the test set, which was never used for any choice.
-        </p>
+        <p className="mt-3 text-xs text-muted">{t.how.tableNote}</p>
       </motion.div>
 
       <motion.div
@@ -113,11 +105,11 @@ function Metrics({ info }: { info: ModelInfo | null }) {
         viewport={{ once: true, margin: "-80px" }}
         transition={{ duration: 0.6, delay: 0.15 }}
       >
-        <h3 className="label mb-4">Mean error by age group (years)</h3>
+        <h3 className="label mb-4">{t.how.byAge}</h3>
         <div className="space-y-3">
           {groups.map((g) => (
             <div key={g} className="grid grid-cols-[3.5rem_1fr] items-center gap-3">
-              <span className="font-mono text-xs text-muted">{g}</span>
+              <span dir="ltr" className="text-start font-mono text-xs text-muted">{g}</span>
               <div className="space-y-1">
                 {models.map((m, mi) => {
                   const v = m.mae_by_age_group[g];
@@ -156,6 +148,7 @@ function Metrics({ info }: { info: ModelInfo | null }) {
 
 /** Per-group FairFace results before and after adding diverse training data. */
 function Diversity({ groups }: { groups: Record<string, FairFaceGroup> }) {
+  const t = useT();
   const names = Object.keys(groups).filter((g) => g !== "All");
   const all = groups.All;
   return (
@@ -166,19 +159,16 @@ function Diversity({ groups }: { groups: Record<string, FairFaceGroup> }) {
       transition={{ duration: 0.6 }}
       className="mt-16"
     >
-      <h3 className="label mb-2">Diversity · FairFace test set, {all?.faces.toLocaleString("en")} faces from 7 groups</h3>
-      <p className="mb-4 max-w-2xl text-sm text-muted">
-        Adding FairFace to the training data cut the error on faces from every group roughly in half.
-        Years outside the labelled age range (lower is better) · share of predictions inside the range.
-      </p>
+      <h3 className="label mb-2">{t.how.diversityTitle(all?.faces.toLocaleString("en") ?? "")}</h3>
+      <p className="mb-4 max-w-2xl text-sm text-muted">{t.how.diversityIntro}</p>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[34rem] font-mono text-sm">
           <thead>
             <tr className="border-b border-line text-muted">
-              <th scope="col" className="py-2 text-start font-normal">Group</th>
-              <th scope="col" className="py-2 text-end font-normal">UTKFace only</th>
-              <th scope="col" className="py-2 text-end font-normal">+ FairFace</th>
-              <th scope="col" className="py-2 text-end font-normal">In range</th>
+              <th scope="col" className="py-2 text-start font-normal">{t.how.colGroup}</th>
+              <th scope="col" className="py-2 text-end font-normal">{t.how.colBefore}</th>
+              <th scope="col" className="py-2 text-end font-normal">{t.how.colAfter}</th>
+              <th scope="col" className="py-2 text-end font-normal">{t.how.colInRange}</th>
             </tr>
           </thead>
           <tbody>
@@ -186,11 +176,12 @@ function Diversity({ groups }: { groups: Record<string, FairFaceGroup> }) {
               const r = groups[g];
               return (
                 <tr key={g} className={`border-b border-line ${g === "All" ? "font-medium" : ""}`}>
-                  <th scope="row" className="py-2.5 text-start font-normal">{g.replace("_", " / ")}</th>
-                  <td className="py-2.5 text-end text-muted">{r.outside_before.toFixed(2)} y</td>
-                  <td className="py-2.5 text-end text-accent">{r.outside_after.toFixed(2)} y</td>
+                  <th scope="row" className="py-2.5 text-start font-normal">{t.how.groups[g] ?? g.replace("_", " / ")}</th>
+                  <td className="py-2.5 text-end text-muted">{r.outside_before.toFixed(2)} {t.how.y}</td>
+                  <td className="py-2.5 text-end text-accent">{r.outside_after.toFixed(2)} {t.how.y}</td>
                   <td className="py-2.5 text-end">
-                    {r.in_range_before.toFixed(0)}% → {r.in_range_after.toFixed(0)}%
+                    {/* Numbers and arrow read left-to-right in both languages */}
+                    <span dir="ltr">{r.in_range_before.toFixed(0)}% → {r.in_range_after.toFixed(0)}%</span>
                   </td>
                 </tr>
               );

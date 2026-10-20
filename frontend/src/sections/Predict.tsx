@@ -6,16 +6,32 @@ import { Dropzone } from "../components/Dropzone";
 import { SectionHeading } from "../components/SectionHeading";
 import { Webcam } from "../components/Webcam";
 import { readPickedFile } from "../lib/files";
+import { useT } from "../i18n";
+import type { Dict } from "../i18n/en";
 import {
   api, ApiError, IN_BROWSER, MAX_UPLOAD_MB, MODEL_LABELS, onModelDownload, pngSrc, type DownloadProgress,
   type Health, type ModelInfo, type ModelName, type PredictResponse,
 } from "../lib/api";
 
+type ErrorCode = Exclude<keyof Dict["predict"]["errors"], "tooLarge">;
 type State =
   | { kind: "idle" }
   | { kind: "loading" }
   | { kind: "done"; result: PredictResponse }
-  | { kind: "error"; message: string; noFace?: boolean };
+  // Errors are stored as codes, so their text follows the language toggle
+  | { kind: "error"; code: ErrorCode | "tooLarge"; detail?: string };
+
+/** Maps API / in-browser engine errors (English messages) to translatable codes. */
+function errorFrom(e: unknown): Extract<State, { kind: "error" }> {
+  if (!(e instanceof ApiError)) return { kind: "error", code: "generic" };
+  if (e.status === 422) return { kind: "error", code: "noFace" };
+  if (e.message.startsWith("Could not decode")) return { kind: "error", code: "couldNotDecode" };
+  if (e.message.startsWith("Can't reach the server")) return { kind: "error", code: "serverUnreachable" };
+  if (e.message.startsWith("Couldn't load or run the model")) {
+    return { kind: "error", code: "modelLoadFailed", detail: e.message.match(/\((.*)\)$/)?.[1] };
+  }
+  return { kind: "error", code: "generic", detail: e.message };
+}
 
 const FALLBACK_MAE = 6;
 
@@ -25,6 +41,7 @@ export function Predict({ health, info, offline }: { health: Health | null; info
   const [model, setModel] = useState<ModelName | null>(null);
   const [state, setState] = useState<State>({ kind: "idle" });
   const requestId = useRef(0);
+  const t = useT();
 
   const activeModel = model ?? health?.default_model ?? null;
   const loadedModels = (Object.keys(MODEL_LABELS) as ModelName[]).filter((m) => health?.models[m]);
@@ -38,19 +55,18 @@ export function Predict({ health, info, offline }: { health: Health | null; info
       if (id === requestId.current) setState({ kind: "done", result });
     } catch (e) {
       if (id !== requestId.current) return;
-      const err = e instanceof ApiError ? e : new ApiError(0, "Something went wrong");
-      setState({ kind: "error", message: err.message, noFace: err.status === 422 });
+      setState(errorFrom(e));
     }
   }, []);
 
   const accept = async (original: Blob) => {
     // Some phones hand over photos with an empty MIME type, so only reject types that are clearly not images
     if (original.type && !original.type.startsWith("image/")) {
-      setState({ kind: "error", message: "That file isn't an image. Try a JPG, PNG or WebP." });
+      setState({ kind: "error", code: "notImage" });
       return;
     }
     if (original.size > MAX_UPLOAD_MB * 1024 * 1024) {
-      setState({ kind: "error", message: `That image is larger than ${MAX_UPLOAD_MB} MB.` });
+      setState({ kind: "error", code: "tooLarge" });
       return;
     }
     setWebcam(false);
@@ -61,14 +77,11 @@ export function Predict({ health, info, offline }: { health: Health | null; info
     try {
       blob = await toDecodableBlob(original);
     } catch {
-      setState({
-        kind: "error",
-        message: "Your phone didn't let the browser read this photo. Save it to the gallery first, or take a picture with the camera.",
-      });
+      setState({ kind: "error", code: "unreadable" });
       return;
     }
     if (!blob) {
-      setState({ kind: "error", message: "This photo's format can't be read in this browser. Try a JPG or PNG, or use the camera." });
+      setState({ kind: "error", code: "formatUnsupported" });
       return;
     }
     setImage({ blob, url: URL.createObjectURL(blob) });
@@ -97,14 +110,13 @@ export function Predict({ health, info, offline }: { health: Health | null; info
   return (
     <section id="predict" className="border-b border-line">
       <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-28">
-        <SectionHeading index="01" kicker="Predict" title={<>Show it a <em className="text-accent">face</em>.</>}>
-          Every face in the photo is detected, cropped and shrunk to the 128×128 image the network was trained on —
-          you'll see exactly what it saw.
+        <SectionHeading index="01" kicker={t.predict.kicker} title={t.predict.title}>
+          {t.predict.intro}
         </SectionHeading>
 
         {loadedModels.length > 1 && (
-          <div role="radiogroup" aria-label="Model" className="mb-6 flex flex-wrap items-center gap-2">
-            <span className="label me-2">Model</span>
+          <div role="radiogroup" aria-label={t.predict.model} className="mb-6 flex flex-wrap items-center gap-2">
+            <span className="label me-2">{t.predict.model}</span>
             {loadedModels.map((m) => (
               <button
                 key={m}
@@ -126,9 +138,9 @@ export function Predict({ health, info, offline }: { health: Health | null; info
           <p role="status" className="mb-6 border-s-2 border-amber bg-surface px-4 py-3 text-sm text-muted">
             {offline
               ? IN_BROWSER
-                ? "The model files couldn't be downloaded. Check your connection and reload the page."
-                : "The prediction server isn't reachable right now. Start the backend and reload the page."
-              : "The server is up but no trained model or face detector is loaded. Put the model files in ./models."}
+                ? t.predict.unavailableBrowser
+                : t.predict.unavailableServer
+              : t.predict.unavailableNoModel}
           </p>
         )}
 
@@ -168,6 +180,7 @@ function PhotoWithBoxes({ url, state, onFile, onWebcam, onReset }: {
   const result = state.kind === "done" ? state.result : null;
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const t = useT();
 
   return (
     <div className="flex flex-col gap-4">
@@ -187,7 +200,7 @@ function PhotoWithBoxes({ url, state, onFile, onWebcam, onReset }: {
           if (f) void readPickedFile(f).then(onFile);
         }}
       >
-        <img src={url} alt="Uploaded photo" className="block max-h-[70vh] max-w-full" />
+        <img src={url} alt={t.predict.uploadedAlt} data-testid="uploaded-photo" className="block max-h-[70vh] max-w-full" />
 
         {state.kind === "loading" && (
           <motion.div
@@ -214,7 +227,7 @@ function PhotoWithBoxes({ url, state, onFile, onWebcam, onReset }: {
             }}
           >
             <CornerMarks size="size-[18%]" />
-            <span className="absolute -top-7 left-0 whitespace-nowrap bg-accent px-2 py-0.5 font-mono text-xs font-medium text-bg">
+            <span dir="ltr" className="absolute -top-7 left-0 whitespace-nowrap bg-accent px-2 py-0.5 font-mono text-xs font-medium text-bg">
               #{i + 1} · <AgeCounter value={f.age} delay={i * 0.15} />
             </span>
           </motion.div>
@@ -222,7 +235,7 @@ function PhotoWithBoxes({ url, state, onFile, onWebcam, onReset }: {
 
         {dragging && (
           <div className="absolute inset-0 grid place-items-center border-2 border-dashed border-accent bg-bg/70">
-            <p className="font-display text-2xl">Drop to replace</p>
+            <p className="font-display text-2xl">{t.predict.dropToReplace}</p>
           </div>
         )}
       </div>
@@ -234,17 +247,17 @@ function PhotoWithBoxes({ url, state, onFile, onWebcam, onReset }: {
           disabled={state.kind === "loading"}
           className="rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-bg transition-transform hover:-translate-y-0.5 disabled:opacity-40"
         >
-          Choose another photo
+          {t.predict.chooseAnother}
         </button>
         <button
           type="button"
           onClick={onWebcam}
           className="rounded-full border border-line px-5 py-2.5 text-sm font-medium transition-colors hover:border-accent"
         >
-          Use webcam
+          {t.predict.useWebcam}
         </button>
         <button type="button" onClick={onReset} className="label px-2 transition-colors hover:text-text">
-          Clear
+          {t.predict.clear}
         </button>
       </div>
       <input
@@ -252,7 +265,8 @@ function PhotoWithBoxes({ url, state, onFile, onWebcam, onReset }: {
         type="file"
         accept="image/*,.heic,.heif"
         className="sr-only"
-        aria-label="Choose another photo"
+        aria-label={t.predict.chooseAnother}
+        data-testid="replace-photo"
         onChange={async (e) => {
           const input = e.target;
           const f = input.files?.[0];
@@ -268,18 +282,19 @@ function PhotoWithBoxes({ url, state, onFile, onWebcam, onReset }: {
 }
 
 function Results({ state, mae, hasImage, onRetry }: { state: State; mae: number; hasImage: boolean; onRetry: () => void }) {
+  const t = useT();
   if (state.kind === "idle") {
     return (
       <div className="flex h-full min-h-48 flex-col justify-center border border-line p-6">
-        <p className="label mb-2">Waiting for a photo</p>
-        <p className="text-muted">Results appear here: the estimated age and the exact crop the model received for each face.</p>
+        <p className="label mb-2">{t.predict.waitingTitle}</p>
+        <p className="text-muted">{t.predict.waitingBody}</p>
       </div>
     );
   }
   if (state.kind === "loading") {
     return (
       <div className="flex flex-col gap-3" aria-busy="true">
-        <p className="label">{IN_BROWSER ? <BrowserLoadingLabel /> : "Detecting faces…"}</p>
+        <p className="label">{IN_BROWSER ? <BrowserLoadingLabel /> : t.predict.detecting}</p>
         {[0, 1].map((i) => (
           <div key={i} className="flex animate-pulse gap-4 border border-line p-4">
             <div className="size-24 bg-surface-2" />
@@ -293,16 +308,19 @@ function Results({ state, mae, hasImage, onRetry }: { state: State; mae: number;
     );
   }
   if (state.kind === "error") {
+    const noFace = state.code === "noFace";
+    const message = state.code === "tooLarge" ? t.predict.errors.tooLarge(MAX_UPLOAD_MB) : t.predict.errors[state.code];
     return (
       <div role="alert" className="border border-accent/40 bg-accent-soft p-6">
-        <p className="label mb-2 text-accent">{state.noFace ? "No face found" : "Something went wrong"}</p>
-        <p>{state.message}</p>
-        {state.noFace && (
-          <p className="mt-2 text-sm text-muted">Try a well-lit photo where the face is clearly visible and facing the camera.</p>
+        <p className="label mb-2 text-accent">{noFace ? t.predict.noFaceTitle : t.predict.errorTitle}</p>
+        <p>{message}</p>
+        {state.detail && (
+          <p dir="ltr" className="mt-2 text-start font-mono text-xs text-muted">{state.detail}</p>
         )}
-        {hasImage && !state.noFace && (
+        {noFace && <p className="mt-2 text-sm text-muted">{t.predict.noFaceTip}</p>}
+        {hasImage && !noFace && (
           <button type="button" onClick={onRetry} className="mt-4 rounded-full border border-line px-4 py-1.5 text-sm">
-            Retry
+            {t.predict.retry}
           </button>
         )}
       </div>
@@ -313,7 +331,7 @@ function Results({ state, mae, hasImage, onRetry }: { state: State; mae: number;
   return (
     <div className="flex flex-col gap-4">
       <p className="label">
-        {result.faces.length} face{result.faces.length > 1 ? "s" : ""} · {MODEL_LABELS[result.model]}
+        {t.predict.facesCount(result.faces.length)} · {MODEL_LABELS[result.model]}
       </p>
       <AnimatePresence>
         {result.faces.map((f, i) => (
@@ -327,21 +345,21 @@ function Results({ state, mae, hasImage, onRetry }: { state: State; mae: number;
             <figure className="shrink-0">
               <img
                 src={pngSrc(f.crop)}
-                alt={`Model input for face ${i + 1}`}
+                alt={t.predict.modelInputAlt(i + 1)}
                 width={112}
                 height={112}
                 className="size-28 [image-rendering:pixelated]"
               />
-              <figcaption className="label mt-1.5 text-[10px]">model input · 128²</figcaption>
+              <figcaption className="label mt-1.5 text-[10px]">{t.predict.modelInputCaption}</figcaption>
             </figure>
             <div className="flex min-w-0 flex-col justify-center">
-              <p className="label">Face #{i + 1} · estimated age</p>
+              <p className="label">{t.predict.faceEstimated(i + 1)}</p>
               <p className="font-display text-6xl leading-none">
                 <AgeCounter value={f.age} delay={i * 0.15} />
-                <span className="ms-2 text-xl text-muted">yrs</span>
+                <span className="ms-2 text-xl text-muted">{t.predict.yrs}</span>
               </p>
               <p className="mt-2 font-mono text-xs text-muted">
-                ± {mae.toFixed(1)} years <span className="opacity-70">(mean error on unseen faces)</span>
+                {t.predict.plusMinus(mae.toFixed(1))} <span className="opacity-70">{t.predict.meanErrorNote}</span>
               </p>
             </div>
           </motion.article>
@@ -354,10 +372,11 @@ function Results({ state, mae, hasImage, onRetry }: { state: State; mae: number;
 /** "Downloading models… 12 / 25 MB" while model files arrive (first visit), then "Running the model…". */
 function BrowserLoadingLabel() {
   const [p, setP] = useState<DownloadProgress>({ loaded: 0, total: 0, active: 0 });
+  const t = useT();
   useEffect(() => onModelDownload(setP), []);
   if (p.active > 0 && p.total > 0) {
     const mb = (n: number) => (n / 1024 / 1024).toFixed(0);
-    return <>Downloading models (first visit only)… {mb(p.loaded)} / {mb(p.total)} MB</>;
+    return <>{t.predict.downloading(mb(p.loaded), mb(p.total))}</>;
   }
-  return <>Running the model in your browser…</>;
+  return <>{t.predict.running}</>;
 }

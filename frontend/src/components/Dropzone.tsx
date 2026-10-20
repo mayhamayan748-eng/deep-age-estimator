@@ -1,10 +1,12 @@
 import { useRef, useState } from "react";
 import { MAX_UPLOAD_MB } from "../lib/api";
 import { readPickedFile } from "../lib/files";
+import { useT } from "../i18n";
 
 export function Dropzone({ onFile, onWebcam }: { onFile: (f: File) => void; onWebcam: () => void }) {
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const t = useT();
 
   return (
     <div
@@ -29,8 +31,8 @@ export function Dropzone({ onFile, onWebcam }: { onFile: (f: File) => void; onWe
         <path d="M13 37c1.5-6 5.5-9 11-9s9.5 3 11 9" />
       </svg>
       <div>
-        <p className="font-display text-2xl">Drop a photo here</p>
-        <p className="mt-1 text-sm text-muted">JPG, PNG or WebP · up to {MAX_UPLOAD_MB} MB · faces are detected automatically</p>
+        <p className="font-display text-2xl">{t.dropzone.dropHere}</p>
+        <p className="mt-1 text-sm text-muted">{t.dropzone.hint(MAX_UPLOAD_MB)}</p>
       </div>
       <div className="flex flex-wrap justify-center gap-3">
         <button
@@ -38,14 +40,14 @@ export function Dropzone({ onFile, onWebcam }: { onFile: (f: File) => void; onWe
           onClick={() => inputRef.current?.click()}
           className="rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-bg"
         >
-          Choose a file
+          {t.dropzone.chooseFile}
         </button>
         <button
           type="button"
           onClick={onWebcam}
           className="rounded-full border border-line px-5 py-2.5 text-sm font-medium transition-colors hover:border-accent"
         >
-          Use webcam
+          {t.predict.useWebcam}
         </button>
       </div>
       <input
@@ -53,7 +55,7 @@ export function Dropzone({ onFile, onWebcam }: { onFile: (f: File) => void; onWe
         type="file"
         accept="image/*,.heic,.heif"
         className="sr-only"
-        aria-label="Upload a photo"
+        aria-label={t.dropzone.uploadAria}
         onChange={async (e) => {
           const input = e.target;
           const f = input.files?.[0];
