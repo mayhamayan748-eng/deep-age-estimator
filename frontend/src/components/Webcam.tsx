@@ -5,6 +5,8 @@ export function Webcam({ onCapture, onCancel }: { onCapture: (b: Blob) => void; 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  // Front cameras are shown like a mirror, as phone camera apps do; a rear camera is shown as is
+  const [mirrored, setMirrored] = useState(true);
 
   useEffect(() => {
     let stream: MediaStream | null = null;
@@ -18,6 +20,7 @@ export function Webcam({ onCapture, onCancel }: { onCapture: (b: Blob) => void; 
       .then((s) => {
         if (cancelled) return s.getTracks().forEach((t) => t.stop());
         stream = s;
+        setMirrored(s.getVideoTracks()[0]?.getSettings().facingMode !== "environment");
         if (videoRef.current) videoRef.current.srcObject = s;
       })
       .catch(() => setError("Camera access was denied or no camera was found."));
@@ -33,7 +36,14 @@ export function Webcam({ onCapture, onCancel }: { onCapture: (b: Blob) => void; 
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    canvas.getContext("2d")!.drawImage(video, 0, 0);
+    const ctx = canvas.getContext("2d")!;
+    // Keep the photo exactly as the user saw it in the preview (age predictions average both
+    // orientations anyway, so mirroring doesn't change the result)
+    if (mirrored) {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0);
     canvas.toBlob((b) => b && onCapture(b), "image/jpeg", 0.92);
   };
 
@@ -49,7 +59,7 @@ export function Webcam({ onCapture, onCancel }: { onCapture: (b: Blob) => void; 
             playsInline
             muted
             onLoadedData={() => setReady(true)}
-            className="size-full object-cover"
+            className={`size-full object-cover ${mirrored ? "-scale-x-100" : ""}`}
           />
         )}
         <CornerMarks size="size-6" />
