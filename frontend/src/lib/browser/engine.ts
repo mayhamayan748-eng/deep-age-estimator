@@ -2,16 +2,21 @@
  * In-browser implementation of the API (same responses as the FastAPI backend), so the site can be
  * hosted as static files. Mirrors backend/app/services/models.py and preprocessing.py.
  */
-import * as ort from "onnxruntime-web/wasm";
-import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.wasm?url";
-import mjsUrl from "onnxruntime-web/ort-wasm-simd-threaded.mjs?url";
+// onnxruntime-web 1.18 "wasm-core": the last release with single-threaded WebAssembly builds. Newer releases
+// only ship multi-threaded builds, which declare shared WebAssembly memory; iOS Safari fails to allocate it
+// ("RangeError: Out of memory"), so the models could not load on iPhones.
+import * as ort from "onnxruntime-web/wasm-core";
+// The package's exports map hides dist/, so the files are referenced by path; Vite emits them as assets
+import simdWasmUrl from "../../../node_modules/onnxruntime-web/dist/ort-wasm-simd.wasm?url";
+import plainWasmUrl from "../../../node_modules/onnxruntime-web/dist/ort-wasm.wasm?url";
 import type { FacePrediction, GenerateResponse, Health, ModelInfo, ModelName, PredictResponse } from "../api";
 import { bgrToGray, bgrToRgb, crop, decodeImage, encodePngBase64, resizeLinear, roundHalfEven, type Image } from "./imageops";
 import { detectFaces, type Box } from "./yunet";
 
-ort.env.wasm.wasmPaths = { wasm: wasmUrl, mjs: mjsUrl };
-// Static hosts don't send the COOP/COEP headers that multi-threaded WASM needs
+// SIMD build where supported (iOS 16.4+), plain build otherwise
+ort.env.wasm.wasmPaths = { "ort-wasm-simd.wasm": simdWasmUrl, "ort-wasm.wasm": plainWasmUrl };
 ort.env.wasm.numThreads = 1;
+ort.env.wasm.proxy = false;
 
 const MODEL_BASE = (import.meta.env.VITE_MODEL_BASE ?? `${import.meta.env.BASE_URL}models/`).replace(/\/?$/, "/");
 // Static hosts send no cache headers. Data files get a per-build URL; model files get a URL tied to their

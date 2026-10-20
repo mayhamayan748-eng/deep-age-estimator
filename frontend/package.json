@@ -12,7 +12,7 @@
   "dependencies": {
     "heic2any": "^0.0.4",
     "motion": "^14.2.0",
-    "onnxruntime-web": "^1.30.0",
+    "onnxruntime-web": "^1.18.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },

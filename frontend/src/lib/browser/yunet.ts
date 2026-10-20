@@ -2,7 +2,7 @@
  * cv2.FaceDetectorYN re-implemented on onnxruntime-web: pad to a multiple of 32, run YuNet, decode the
  * three stride heads and apply cv2.dnn.NMSBoxes. Matches OpenCV's boxes and scores on the test photos.
  */
-import type { InferenceSession, Tensor as OrtTensor } from "onnxruntime-web/wasm";
+import type { InferenceSession, Tensor as OrtTensor } from "onnxruntime-web/wasm-core";
 import type { Image } from "./imageops";
 
 export type Box = [x: number, y: number, w: number, h: number];
